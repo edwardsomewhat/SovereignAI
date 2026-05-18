@@ -425,13 +425,14 @@ approvals:
   mcp_reload_confirm: true
   destructive_slash_confirm: true
 command_allowlist:
-- overwrite system file via redirection
-- pipe remote content to shell
-- stop/restart system service
-- copy/move file into /etc/
 - sudo with combined-flag privilege escalation
-- stop/restart hermes gateway (kills running agents)
+- overwrite system file via redirection
+- copy/move file into /etc/
 - sudo with privilege flag (stdin/askpass/shell/list)
+- stop/restart system service
+- script execution via -e/-c flag
+- stop/restart hermes gateway (kills running agents)
+- pipe remote content to shell
 quick_commands: {}
 hooks: {}
 hooks_auto_accept: false
