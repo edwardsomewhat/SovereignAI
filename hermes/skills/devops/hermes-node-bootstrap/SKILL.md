@@ -178,6 +178,10 @@ git config user.email "edwardsomewhat@gmail.com"
 
 Use `git add -A && git commit -m "<message>" && git push origin main` for initial bulk pushes. The repo should be `--private` since it contains configuration patterns you may not want public.
 
+## Alternative: Direct SSH Bootstrap (No Git Repo)
+
+For one-off bootstraps or rapid prototyping, you can SSH directly into the target node without creating a git repo first. Install Hermes, configure the provider, copy skills/persona/MCP servers, and verify — all over SSH. Full sequence in `references/direct-ssh-bootstrap.md`. This is faster for 1-2 nodes; for 3+ nodes, prefer the git repo pattern above.
+
 ## Common Pitfalls
 
 1. **Committing .env or secrets.** The `.env` file contains API keys and the GITHUB_TOKEN. Always gitignore it. Triple-check before commit with `git diff --cached --name-only | grep -i env`.
