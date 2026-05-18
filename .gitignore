@@ -1,0 +1,20 @@
+# Secrets (tokens, API keys)
+/.env
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Local test artifacts
+/tmp/
+*.test.*

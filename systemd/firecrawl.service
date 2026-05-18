@@ -1,0 +1,21 @@
+[Unit]
+Description=Firecrawl-simple self-hosted web scraper
+Documentation=https://github.com/devflowinc/firecrawl-simple
+After=docker.service
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=fated
+Group=docker
+WorkingDirectory=/home/fated/firecrawl-simple
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+ExecReload=/usr/bin/docker compose restart
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,17 @@
+[Unit]
+Description=Hermes Agent Dashboard
+Documentation=https://hermes-agent.nousresearch.com
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fated
+ExecStart=/home/fated/.hermes/hermes-agent/venv/bin/hermes dashboard --host 0.0.0.0 --port 9119 --insecure --no-open --skip-build
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
