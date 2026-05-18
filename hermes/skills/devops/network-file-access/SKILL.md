@@ -1,18 +1,18 @@
 ---
 name: network-file-access
 description: "Access files on remote machines in the local network or Tailscale tailnet — Windows (SMB), Linux (SSH/SFTP), and file shares. Use when the user provides a remote machine IP/hostname/password or file path on another machine."
-version: 1.0.0
+version: 1.1.0
 author: Hermes Agent
 license: MIT
 metadata:
   hermes:
-    tags: [networking, file-transfer, SMB, SSH, tailscale, Windows-access, remote-files]
+    tags: [networking, file-transfer, SMB, SSH, tailscale, Windows-access, remote-files, taildrop, tailscale-api]
     related_skills: [github-auth, obsidian]
 ---
 
 # Network File Access
 
-Access files on remote machines across the local network or Tailscale tailnet. Covers Windows (SMB), Linux (SSH/SFTP), and generic file shares.
+Access files on remote machines across the local network or Tailscale tailnet. Covers Windows (SMB), Linux (SSH/SFTP), Tailscale-specific access (Tailscale SSH, Taildrop, local daemon API), and generic file shares.
 
 ## Prerequisites
 
@@ -38,7 +38,7 @@ for port in 22 445 3389 5985 5986; do
 done
 ```
 
-## Method 1: SMB: Windows Machine Access (SMB)
+## Method 1: SMB — Windows Machine Access
 
 Best for reaching Windows machines on a local network or Tailscale tailnet.
 
@@ -163,6 +163,76 @@ sshpass -p '<password>' scp -o StrictHostKeyChecking=no <user>@<ip>:"<remote-pat
 sshpass -p '<password>' sftp -o StrictHostKeyChecking=no <user>@<ip> <<< "ls -la <remote-path>"
 ```
 
+## Method 3: Tailscale Tailnet Access
+
+For networks connected via Tailscale. All nodes are reachable by their Tailscale IP (100.x.y.z) regardless of physical location.
+
+### Node Discovery
+
+```bash
+# Human-readable list
+tailscale status
+
+# JSON for programmatic use
+tailscale status --json | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+self_node = d.get('Self', {})
+print(f\"This node: {self_node.get('HostName')} ({', '.join(self_node.get('TailscaleIPs', []))})\")
+for k, v in d.get('Peer', {}).items():
+    status = 'ONLINE' if v.get('Online') else 'offline'
+    ips = ', '.join(v.get('TailscaleIPs', []))
+    print(f'  {v.get(\"HostName\", k):20s} {v.get(\"OS\", \"?\"):8s} {status:7s} {ips}')
+"
+```
+
+### Local Daemon API (read-only)
+
+Tailscaled exposes a local API on a Unix socket. Useful for checking connectivity from within scripts:
+
+```bash
+# Status (same as tailscale status --json)
+curl -s --unix-socket /var/run/tailscale/tailscaled.sock \
+  http://local-tailscaled.sock/localapi/v0/status
+
+# WhoIs (resolve IP to node info)
+curl -s --unix-socket /var/run/tailscale/tailscaled.sock \
+  "http://local-tailscaled.sock/localapi/v0/whois?ip=100.69.153.16"
+```
+
+Note: `execute_code` cannot access Unix sockets directly. Use `terminal()` to call curl and parse the JSON in the script.
+
+### Tailscale SSH
+
+If Tailscale SSH is enabled on the tailnet (check with `tailscale status --json` — look for `ssh` in capabilities), you can SSH to any node using its Tailscale IP **without** setting up SSH keys or passwords:
+
+```bash
+ssh <tailscale-ip> "hostname && whoami"
+```
+
+This works because Tailscale manages the SSH session. No password prompt. For file transfers:
+
+```bash
+scp <tailscale-ip>:/path/to/file ./local-dest/
+```
+
+### Taildrop (File Sharing)
+
+Taildrop lets you send files between Tailscale nodes. Requires operator permissions on the receiving node:
+
+```bash
+# One-time setup on the receiving node (needs sudo)
+sudo tailscale set --operator=$USER
+
+# Send a file from any node to this one:
+tailscale file cp /path/to/local/file <tailscale-ip>:
+
+# Check for incoming files on the receiving node:
+tailscale file get ~/Downloads/
+```
+
+Without operator permissions, `tailscale file get` returns "Access denied." The fix is the `--operator` command above.
+
 ## Using Credentials
 
 - The user may provide passwords in freeform text. Multiple options may be given; try them in order
@@ -177,6 +247,7 @@ sshpass -p '<password>' sftp -o StrictHostKeyChecking=no <user>@<ip> <<< "ls -la
 3. **TTL in ping response reveals OS type.** TTL=128 → Windows, TTL=64 → Linux. Use this to decide SMB vs SSH approach
 4. **Editing a fine-grained GitHub PAT regenerates the token.** If you get 401 / Bad credentials after the user said they edited permissions, ask for the new token value
 5. **smbprotocol installed to user site-packages is not visible in execute_code sandbox.** Write SMB scripts to files and run them via `python3 /path/to/script.py` instead
+6. **Tailscale local API requires Unix socket access.** The `execute_code` sandbox cannot access Unix sockets directly. Use `terminal()` to run curl and parse the JSON output separately
 
 ## Verification Checklist
 

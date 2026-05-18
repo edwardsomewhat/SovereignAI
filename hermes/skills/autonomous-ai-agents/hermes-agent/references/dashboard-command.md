@@ -98,6 +98,12 @@ hermes dashboard --stop
 - Verify Tailscale/MagicDNS is working: `tailscale ping <target-ip>`
 - Check that no intermediate firewall is blocking the port
 
+### Port already in use / zombie process holding port
+- Old dashboard processes can hold port 9119 even after the service stops
+- Fix: `hermes dashboard --stop` kills all running dashboard processes
+- Then restart the service: `systemctl --user restart hermes-dashboard.service`
+- Verify: `ss -tlnp | grep 9119` should show the new process, not an old one
+
 ## Persistent/Background Operation
 
 To run the Hermes dashboard persistently (survives terminal/logout, auto-restarts on failure):
@@ -115,7 +121,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/home/fated/.local/bin/hermes dashboard --insecure --port 9119 --host 0.0.0.0
+ExecStart=/home/fated/.local/bin/hermes dashboard --insecure --port 9119 --host 0.0.0.0 --tui
 Restart=on-failure
 RestartSec=5
 
