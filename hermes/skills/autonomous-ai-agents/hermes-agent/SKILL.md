@@ -806,6 +806,19 @@ and logs — avoids shell-escaping backslashes in bash.
 
 ---
 
+## Getting Files to/from a Headless Hermes Instance
+
+When running Hermes on a headless Linux box (SSH only, no GUI, no clipboard), you need other channels to send files, tokens, or configuration to the agent:
+
+| Method | Setup required | Best for |
+|--------|---------------|----------|
+| **Dashboard with `--tui`** | `hermes dashboard --insecure --host 0.0.0.0 --tui` — open in browser from any device on the network | Files, pasting tokens, interactive chat from other devices |
+| **Telegram gateway** | Bot token in `.env`, gateway running | Quick text, images, small files sent as Telegram messages |
+| **Taildrop** (Tailscale) | `sudo tailscale set --operator=$USER` to allow non-root receive. Files dropped to this node land in `~/`. | Large files, arbitrary file types, works from any tailnet device |
+| **SSH from other device** | Standard SSH access | When you have a GUI terminal elsewhere on the tailnet |
+
+After `tailscale set --operator=$USER`, files sent via `tailscale file cp ./file.txt <hostname>:` from any tailnet node appear in the home directory. No restart needed — the agent can read them immediately.
+
 ## Troubleshooting
 
 ### Voice not working
