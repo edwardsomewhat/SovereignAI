@@ -7,6 +7,26 @@ description: "Query the Sovereign RAG database — retrieves relevant context fr
 
 Query the ChromaDB RAG database at `~/.hermes/rag_db/` which contains all SovereignAI documents.
 
+## Architecture
+
+- **Database:** ChromaDB (PersistentClient, SQLite-backed)
+- **Embeddings:** `all-MiniLM-L6-v2` via sentence-transformers (small, fast, local — no API calls)
+- **Collection:** `sovereign_codex`
+- **Chunking:** 1500-char sliding windows with 200-char overlap, broken at paragraph boundaries
+- **Each node has its own independent database** — conchai and sovereign maintain separate indexes from the same source documents
+
+## Setup (first run)
+
+```bash
+# Install dependencies (in Hermes venv)
+/home/fated/.hermes/hermes-agent/venv/bin/pip3 install chromadb sentence-transformers
+
+# Index all SovereignAI documents
+/home/fated/.hermes/hermes-agent/venv/bin/python /home/fated/sovereign_rag.py
+```
+
+The script automatically chunks documents and stores embeddings. Documents are read from the home directory — scp or taildrop new .md/.txt files there before re-indexing.
+
 ## Query
 
 ```bash

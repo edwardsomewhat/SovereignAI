@@ -597,6 +597,20 @@ python3 scripts/fetch_logs.py --tail-queue --host https://cloud.comfy.org
     Use `comfy --skip-prompt tracking disable` to skip non-interactively.
     `comfyui_setup.sh` does this for you.
 
+12. **Workspace directory must not exist** — `comfy --workspace /path install` clones ComfyUI fresh into the target directory. If the directory already exists as a non-git directory, the error is `exists but is not a valid git repository`. `rm -rf` it and retry.
+
+13. **--restore for missing dependencies** — If launch fails with `ModuleNotFoundError` (common: `sqlalchemy`, `alembic`), run `comfy install --nvidia --restore` to reinstall all Python requirements. The initial install can occasionally skip packages, especially on first-run venv setups.
+
+14. **Systemd persistence** — For headless servers, create a systemd user service. Use the venv Python directly (`/workspace/.venv/bin/python main.py --listen 0.0.0.0 --port 8188`), not `comfy-cli launch`. Enable linger for unattended reboots: `sudo loginctl enable-linger $USER`. Copy and customize `templates/comfyui.service`.
+
+15. **Multi-drive storage** — Point `--workspace` to a dedicated data partition (e.g. `/mnt/hermes_data/comfy`) to keep models off root. Models consume 6–50+ GB each. **Never touch Windows/NTFS drives without explicit user confirmation** — ask first, name the specific drive.
+
+16. **Split/sharded model repos** — Some Comfy-Org models are split across multiple safetensors files (e.g. `split_files/diffusion_models/`). `comfy model download --url` expects a single file and returns 404. For these, use `git clone` of the HuggingFace repo directly into `models/<name>/` then `git lfs pull` for the actual weights. Full recipe in `references/split-model-download.md`.
+
+17. **Custom nodes not in Manager registry** — `comfy node install <name>` searches the ComfyUI Manager registry. If a node isn't indexed there (404), clone it from GitHub directly: `cd custom_nodes && git clone <url> && cd <dir> && .venv/bin/pip install -r requirements.txt`. Search GitHub with: `curl -s "https://api.github.com/search/repositories?q=comfyui+<keywords>&sort=stars"`.
+
+18. **Qwen Image Edit specific** — The Comfy-Org HuggingFace model repo (`Comfy-Org/Qwen-Image-Edit_ComfyUI`) is split-model only, not a custom node. The node is `princepainter/ComfyUI-PainterQwenImageEdit` (GitHub). Models are at `Comfy-Org/Qwen-Image-Edit_ComfyUI` (split format, use git clone). Florence2 is available in Manager as `comfyui-florence2`.
+
 ## Verification Checklist
 
 Use `python3 scripts/health_check.py` to run the whole list at once. Manual:

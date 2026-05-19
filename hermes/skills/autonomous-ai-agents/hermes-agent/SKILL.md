@@ -168,6 +168,8 @@ Supported platforms: Telegram, Discord, Slack, WhatsApp, Signal, Email, SMS, Mat
 
 Platform docs: https://hermes-agent.nousresearch.com/docs/user-guide/messaging/
 
+### Multi-node deployment: See `references/multi-node-deployment.md` — SSH key auth between nodes, GitHub SSH keys, rsync + Git for skill sync, sync script untracked-file bug fix.
+
 ### Dashboard-specific commands: See `references/dashboard-command.md` for detailed usage of `hermes dashboard` including network access via Tailscale and persistent operation.
 
 ### Multi-node sync: See `references/sovereign-repo-sync.md` for the SovereignAI git-based sync workflow between Hermes nodes.
