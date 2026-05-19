@@ -58,6 +58,27 @@ echo "y" | hermes mcp add tailscale \
 
 The canonical server script lives at `~/.hermes/mcp-servers/tailscale-mcp/server.py`. It's also stored in the SovereignAI git repo under `hermes/mcp-servers/tailscale-mcp/` for cross-node sync.
 
+## Pitfalls
+
+### `tailscale_ssh` host key verification failure
+
+Both the MCP `tailscale_ssh` tool and `tailscale ssh <host>` CLI can fail with:
+
+```
+No ED25519 host key is known for <host>.tail01322f.ts.net.
+Host key verification failed.
+```
+
+`ssh-keyscan` on the Tailscale FQDN may return nothing because the FQDN resolves via Tailscale DNS but the SSH daemon may only bind to the raw IP.
+
+**Fallback — `sshpass` + Tailscale IP (always works):**
+
+```bash
+sshpass -p '<password>' ssh -o StrictHostKeyChecking=accept-new <user>@<tailscale-ip> "<command>"
+```
+
+Use the raw Tailscale IPv4 (e.g. `100.84.226.78`) instead of the FQDN. This bypasses the MCP tool entirely in favor of direct SSH with password auth — useful when the node doesn't have Tailscale SSH enabled or key-based auth configured.
+
 ## Verification
 
 ```bash

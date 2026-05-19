@@ -1,78 +1,83 @@
 # Multi-Node Hermes Deployment
 
-Pattern for deploying identical Hermes builds across multiple tailnet nodes, keeping skills, config, and tools synchronized.
+Pattern for deploying identical Hermes builds across multiple machines on a
+Tailscale tailnet, using a Git repo as the source of truth.
 
 ## Architecture
 
 ```
-conchai (image-gen node)          sovereign (orchestrator node)
-    │                                    │
-    ├── sovereign-sync.sh ──→ GitHub ──→ git pull + rsync
-    │   (every 1h, cron)         (manual or cron)
-    │                                    │
-    └── rsync skills/ ───────────────────┘
-        (direct, passwordless SSH)
+conchai (image gen node)
+    │
+    ├── hermes skills/config/persona
+    ├── sovereign-sync.sh (cron: push to repo)
+    │
+    ▼
+  GitHub (SovereignAI repo)
+    │
+    ▼
+sovereign (orchestrator node)
+    │
+    ├── git clone → rsync skills
+    └── Fresh memory/sessions per node
 ```
 
-## SSH Key Auth Setup
+## Node Setup Checklist
 
-Passwordless SSH between nodes eliminates security-scanner blocking and approval prompts.
-
+### 1. Install Hermes on target node
 ```bash
-# On conchai (source)
-ssh-keygen -t ed25519 -C "fated@conchai" -N "" -f ~/.ssh/id_ed25519
-cat ~/.ssh/id_ed25519.pub
-
-# On sovereign (target) — add key
-echo "ssh-ed25519 AAA... fated@conchai" >> ~/.ssh/authorized_keys
-chmod 600 ~/.ssh/authorized_keys
+curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
 ```
 
-Test: `ssh fated@100.124.230.56 whoami` — should work without password.
-
-## GitHub SSH Key Setup
-
-Classic PATs (ghp_*) are being rejected by GitHub for HTTPS operations on some setups. Use SSH keys instead:
-
+### 2. Copy config from source node
 ```bash
-ssh-keygen -t ed25519 -C "fated@HOSTNAME"
-cat ~/.ssh/id_ed25519.pub   # add to https://github.com/settings/keys
-ssh -T git@github.com        # verify: "Hi edwardsomewhat!"
-git clone git@github.com:edwardsomewhat/SovereignAI.git
+# API keys only (secrets NOT in repo)
+scp source:.hermes/.env target:.hermes/.env
+
+# Model config
+hermes config set model.default deepseek-v4-pro
+hermes config set model.provider deepseek
+hermes config set model.base_url https://api.deepseek.com/v1
 ```
 
-## Sync Script Bug Fix
-
-The original `sovereign-sync.sh` only detected changes to tracked files via `git diff --quiet`. New/untracked files (like freshly installed skills) were silently missed. Fixed by adding:
-
+### 3. Enable passwordless SSH between nodes
 ```bash
-# Detect new untracked files
-if [ -z "$(git ls-files --others --exclude-standard)" ]; then
-    : # no untracked
-else
-    changed=1
-fi
+# From source node
+cat ~/.ssh/id_ed25519.pub | ssh user@target 'cat >> ~/.ssh/authorized_keys'
 ```
 
-## Direct Skill Sync (No Git)
-
-When GitHub auth is unavailable, rsync skills directly:
-
+### 4. Clone the skills repo
 ```bash
-# conchai → sovereign
-rsync -avz --delete ~/.hermes/skills/ fated@100.124.230.56:~/.hermes/skills/
-
-# Verify
-ssh fated@100.124.230.56 'find ~/.hermes/skills -name SKILL.md | wc -l'
+git clone git@github.com:USER/REPO.git ~/repos/REPO
+rsync -a ~/repos/REPO/hermes/skills/ ~/.hermes/skills/
 ```
 
-This is also useful for initial deployment to a fresh node before Git is configured.
+### 5. Verify parity
+```bash
+echo "Source: $(ssh source 'find ~/.hermes/skills -name SKILL.md | wc -l')"
+echo "Target: $(find ~/.hermes/skills -name SKILL.md | wc -l)"
+```
 
-## Current Deployment
+## Sync Script (runs on source node)
 
-| Node | IP | Role | GitHub SSH |
-|------|-----|------|------------|
-| conchai | 100.69.153.16 | ComfyUI/image-gen | ✓ |
-| sovereign | 100.124.230.56 | Orchestrator/crew | ✓ |
+The sync script pushes skills, config, SOUL.md, and systemd files to the Git repo.
+Cron job runs every hour. Key behaviors:
 
-Both nodes run identical Hermes builds (137 skills). Skills diverge at deployment: conchai adds image-gen nodes, sovereign adds crew orchestration.
+- `rsync -a --delete` mirrors skills exactly
+- `git diff --quiet` checks for tracked file changes
+- `git ls-files --others` catches new/untracked files  
+- Systemd service files are pulled from `/etc/systemd/system/` and `~/.config/systemd/user/`
+
+## Divergence Strategy
+
+- **Base template:** both nodes identical (skills, config, tools)
+- **Post-divergence:** each node gets role-specific additions
+  - Image gen node: ComfyUI models, image workflows
+  - Orchestrator node: crew agents, RAG database
+- **Shared core:** skills, persona, sync pipeline stay synced
+
+## Pitfalls
+
+1. **GitHub PAT expiration** — Classic PATs (`ghp_*`) get rejected for HTTPS git operations. Use SSH keys instead. Register each node's key at github.com/settings/keys.
+2. **Untracked files in sync** — `git diff --quiet` only checks tracked files. New files (untracked) won't trigger a sync commit. Fix: add `git ls-files --others` check to the sync script.
+3. **Memory/sessions are node-specific** — Don't rsync `memories/`, `sessions/`, or `state.db`. Each node builds its own context.
+4. **Different sudo passwords per node** — The network map and memory track these separately. Don't assume one password works everywhere.
