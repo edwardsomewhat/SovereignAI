@@ -1,63 +1,69 @@
-# Multi-Node Hermes Deployment with Skill Sync
+# Multi-Node Hermes Deployment
 
-This workflow keeps multiple Hermes nodes (e.g., conchai and sovereign) identical in skills and configuration using a shared git repo.
+How to deploy Hermes to a second node, mirror skills, and keep both nodes synchronized via a git repo.
 
-## Architecture
-
-```
-conchai (image gen node)          sovereign (orchestrator)
-    │                                    │
-    │  sovereign-sync.sh                 │  manual rsync
-    │  (cron every hour)                  │  from repo
-    ▼                                    ▼
-┌─────────────────────────────────────────────┐
-│     SovereignAI git repo (GitHub)           │
-│     hermes/                                 │
-│       skills/     (rsync'd from conchai)    │
-│       config.yaml (sanitized, no secrets)   │
-│       SOUL.md     (persona)                 │
-│     scripts/                                │
-│       sovereign-sync.sh                     │
-│     systemd/                                │
-│       hermes-dashboard.service              │
-│       firecrawl.service                     │
-└─────────────────────────────────────────────┘
-```
-
-## Setup on a New Node
+## Deployment
 
 ```bash
-# 1. Clone the repo (needs GitHub SSH key or PAT)
-git clone git@github.com:edwardsomewhat/SovereignAI.git ~/repos/sovereign-ai
+# On target node
+curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
 
-# 2. Sync skills from repo to Hermes
-rsync -a ~/repos/sovereign-ai/hermes/skills/ ~/.hermes/skills/
-
-# 3. Sync config and persona
-cp ~/repos/sovereign-ai/hermes/SOUL.md ~/.hermes/SOUL.md
-# config.yaml: merge manually or use hermes config set commands
+# Configure model to match source node
+hermes config set model.default deepseek-v4-pro
+hermes config set model.provider deepseek
+hermes config set model.base_url https://api.deepseek.com/v1
 ```
 
-## Sync from Conchai to Repo
+## Skill Sync (rsync)
 
-The sync script at `~/.hermes/scripts/sovereign-sync.sh`:
-- Compares and copies config.yaml, SOUL.md
-- Rsyncs entire skills directory
-- Copies systemd service files
-- Detects untracked files (new skills)
-- Auto-commits and pushes to GitHub
+When SSH key auth is set up between nodes:
 
 ```bash
-# Run manually:
-bash ~/.hermes/scripts/sovereign-sync.sh
+# Push skills from source to target
+rsync -avz --delete ~/.hermes/skills/ user@target:~/.hermes/skills/
 
-# Or set up cron (runs hourly):
-# hermes cron create "0 * * * *" --script ~/.hermes/scripts/sovereign-sync.sh --no-agent
+# Verify
+find ~/.hermes/skills -name "SKILL.md" | wc -l  # should match
+```
+
+## Repo-Based Sync (SovereignAI pattern)
+
+A git repo serves as the canonical source. Source node runs a sync script that:
+1. rsyncs skills, config, SOUL.md to the repo
+2. Detects changes (tracked + untracked files)
+3. Auto-commits and pushes to GitHub
+
+Target node clones the repo and rsyncs from it.
+
+## SSH Key Auth Between Nodes
+
+Eliminates password prompts and security scanner blocks:
+
+```bash
+# Generate key on source if needed
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519
+
+# Add to target's authorized_keys
+ssh-copy-id user@target
+# Or manually: cat ~/.ssh/id_ed25519.pub >> target:~/.ssh/authorized_keys
+
+# Verify
+ssh user@target 'echo works'
+```
+
+## GitHub SSH for Both Nodes
+
+Both nodes should have SSH keys registered on GitHub for push/pull access:
+
+```bash
+ssh-keygen -t ed25519 -C "user@hostname"
+cat ~/.ssh/id_ed25519.pub  # add to github.com/settings/keys
+ssh -T git@github.com       # verify
 ```
 
 ## Pitfalls
 
-- **GitHub PAT issues**: Classic PATs (`ghp_*`) are being phased out. Use SSH key auth on sovereign.
-- **Untracked files**: The sync script (v1) didn't detect new/untracked files. Fixed in the version committed to the repo.
-- **Secrets**: Never commit `.env` files. The `config.yaml` has empty API key fields.
-- **Large skills**: Full skill sync is ~12MB. Rsync is efficient for incremental changes.
+- `hermes doctor` shows some tools unavailable on fresh install — expected (missing API keys)
+- Classic GitHub PATs (`ghp_*`) may fail for HTTPS git operations — use SSH instead
+- rsync `--delete` ensures target mirrors source exactly, removing orphaned skills
+- Sync script must check for untracked files (`git ls-files --others --exclude-standard`) not just diffs

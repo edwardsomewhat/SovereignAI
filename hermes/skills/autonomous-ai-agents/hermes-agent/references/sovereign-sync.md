@@ -1,79 +1,43 @@
-# Sovereign AI Multi-Node Sync
+# SovereignAI Repo Sync Pattern
 
-Pattern for keeping multiple Hermes nodes identical via a Git repository.
+The SovereignAI git repo (`github.com/edwardsomewhat/SovereignAI`) is the canonical source for Hermes config across all nodes. The sync script at `~/.hermes/scripts/sovereign-sync.sh` maintains this.
 
-## Architecture
+## How It Works
 
-```
-conchai (source) → git push → GitHub (SovereignAI repo) → git pull → sovereign (target)
-```
+1. **Source → Repo**: rsyncs `~/.hermes/skills/`, `config.yaml`, `SOUL.md`, and systemd service files into the repo
+2. **Detect changes**: compares files, checks for untracked files, tracks git diff
+3. **Auto-commit**: `git add -A && git commit -m "auto-sync: YYYY-MM-DD HH:MM UTC"`
+4. **Push**: to GitHub via SSH
 
-## Sync Script (runs on source node)
+## Target Node Sync
 
 ```bash
-#!/bin/bash
-REPO_DIR="$HOME/repos/sovereign-ai"
-HERMES_DIR="$HOME/.hermes"
+# Clone and sync
+git clone git@github.com:edwardsomewhat/SovereignAI.git ~/repos/sovereign-ai
+rsync -a ~/repos/sovereign-ai/hermes/skills/ ~/.hermes/skills/
+```
 
-cd "$REPO_DIR" || exit 1
-git pull origin main --ff-only 2>/dev/null || true
+## Files Tracked
 
-changed=0
+| Source | Repo Path |
+|--------|-----------|
+| `~/.hermes/config.yaml` | `hermes/config.yaml` |
+| `~/.hermes/SOUL.md` | `hermes/SOUL.md` |
+| `~/.hermes/skills/` | `hermes/skills/` (rsync --delete) |
+| systemd services | `systemd/` |
 
-# Sync config
-if ! diff -q "$HERMES_DIR/config.yaml" "hermes/config.yaml" 2>/dev/null; then
-    cp "$HERMES_DIR/config.yaml" "hermes/config.yaml"
-    changed=1
-fi
+## Cron Schedule
 
-# Sync SOUL.md
-if [ -f "$HERMES_DIR/SOUL.md" ]; then
-    if ! diff -q "$HERMES_DIR/SOUL.md" "hermes/SOUL.md" 2>/dev/null; then
-        cp "$HERMES_DIR/SOUL.md" "hermes/SOUL.md"
-        changed=1
-    fi
-fi
+Runs every hour via cron. On conchai, managed by the cronjob tool or crontab.
 
-# Sync skills
-rsync -a --delete --quiet "$HERMES_DIR/skills/" "hermes/skills/" 2>/dev/null
-if ! git diff --quiet -- "hermes/skills/"; then
-    changed=1
-fi
+## Script Fix
 
-# Detect untracked files (fixed — original script missed these)
+The sync script originally only checked tracked file diffs, missing new/untracked files. Fixed by adding:
+
+```bash
 if [ -z "$(git ls-files --others --exclude-standard)" ]; then
     : # no untracked
 else
     changed=1
 fi
-
-if [ "$changed" -eq 1 ]; then
-    git add -A
-    git commit -m "auto-sync: $(date '+%Y-%m-%d %H:%M UTC')"
-    git push origin main
-fi
-```
-
-## Pitfalls
-
-**Untracked file detection:** The original sync script only checked `git diff --quiet` which skips untracked files. New skills added to `~/.hermes/skills/` were rsynced to the repo dir but never committed because `changed` stayed 0. Fix: add `git ls-files --others --exclude-standard` check.
-
-**GitHub PAT rejection:** Classic PATs (`ghp_*`) may be rejected for HTTPS git operations ("Password authentication is not supported"). Use SSH key auth instead:
-```bash
-ssh-keygen -t ed25519 -C "fated@<hostname>"
-# Add pubkey to github.com/settings/keys
-git clone git@github.com:edwardsomewhat/SovereignAI.git
-```
-
-**Target node pull:** On the target node, run after the source pushes:
-```bash
-cd ~/repos/sovereign-ai && git pull origin main
-rsync -a ~/repos/sovereign-ai/hermes/skills/ ~/.hermes/skills/
-```
-
-## Cron (on source node)
-
-```bash
-# Run every hour
-(crontab -l 2>/dev/null; echo "0 * * * * bash ~/.hermes/scripts/sovereign-sync.sh") | crontab -
 ```
