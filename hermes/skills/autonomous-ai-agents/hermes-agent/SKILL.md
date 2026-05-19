@@ -168,6 +168,10 @@ Platform docs: https://hermes-agent.nousresearch.com/docs/user-guide/messaging/
 
 ### Dashboard-specific commands: See `references/dashboard-command.md` for detailed usage of `hermes dashboard` including network access via Tailscale and persistent operation.
 
+### Multi-node sync: See `references/sovereign-repo-sync.md` for the SovereignAI git-based sync workflow between Hermes nodes.
+
+### Tailscale MCP: See `references/tailscale-mcp-server.md` for the custom Tailscale MCP server (tailnet status, SSH, file transfer, REST API).
+
 ### Sessions
 
 ```
