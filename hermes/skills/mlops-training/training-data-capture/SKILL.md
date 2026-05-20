@@ -68,3 +68,4 @@ The `sharegpt_format` column stores conversations in ShareGPT format:
 
 ## Reference files
 - `references/user-setup.md` — the actual deployment on this machine
+- `references/session-mining-pipeline.md` — Sovereign session mining pipeline (post-hoc curation from Hermes session DB; separate from the proxy capture system)
