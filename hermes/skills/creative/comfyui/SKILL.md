@@ -641,14 +641,16 @@ python3 scripts/fetch_logs.py --tail-queue --host https://cloud.comfy.org
 
 20. **Flux support models are NOT in Comfy-Org/flux1-dev** — That repo only contains the diffusion model (flux1-dev-fp8.safetensors) and split variants. The CLIP-L, T5 text encoder, and VAE files are in separate repos: `comfyanonymous/flux_text_encoders` (clip_l.safetensors, t5xxl_fp8_e4m3fn.safetensors) and `black-forest-labs/FLUX.1-schnell` (ae.safetensors). The `black-forest-labs/FLUX.1-dev` repo is gated and requires authentication; use the Schnell repo for the open VAE.
 
-21. **Selective LFS pull for split-model repos** — Split-model repos (pitfall #16) can exceed 50 GB total. Clone without pulling LFS blobs, then selectively pull only the variants you want:
+21. **git-lfs is unreliable for HF split-model repos — use wget instead** — Split-model repos (pitfall #16) can exceed 50 GB total. The documented approach of `GIT_LFS_SKIP_SMUDGE=1 git clone` + `git lfs pull -I <glob>` frequently fails: glob patterns silently match nothing (files remain LFS pointers), and `git lfs fetch --all` hangs with 0 bytes transferred. The reliable approach is to clone the repo structure only (for workflow JSON files) and download individual model files via wget:
    ```bash
+   # Clone repo structure only (skip LFS)
    cd models/
    GIT_LFS_SKIP_SMUDGE=1 git clone <hf-repo-url> <folder-name>
-   cd <folder-name>
-   git lfs pull -I "split_files/diffusion_models/*2509*" -I "split_files/loras/*2509*"
+   # Download individual model files via wget — reliable and resumable
+   wget -c -O <folder-name>/split_files/diffusion_models/model.safetensors \
+     "https://huggingface.co/<repo>/resolve/main/split_files/diffusion_models/model.safetensors"
    ```
-   The `-I` flag accepts glob patterns; use multiple `-I` flags to pull disjoint subsets. Skip `git lfs pull` entirely if you only need the JSON workflow files (e.g., Qwen-Image-Edit's bundled workflow lives in the git tree, not LFS). This saves 30–80 GB of disk for repos with many precision variants (bf16, fp8, fp4, nvfp4 all stored as separate LFS objects).
+   For repos with ~10 files you need, wget each one explicitly. For repos with 50+ files, `git lfs pull` MAY work but expect it to hang; fall back to wget. The clone still provides workflow JSONs and directory structure even when LFS fails. This saves 30–80 GB of disk for repos with many precision variants (bf16, fp8, fp4, nvfp4).
 
 22. **comfy-cli hangs silently on large HF downloads** — `comfy model download` can stall indefinitely (0 bytes transferred, process alive but idle) for files >1 GB, especially when fetching from HuggingFace. The process has network sockets open but never begins the transfer. For large checkpoints (Flux, SDXL, SD3), skip comfy-cli and use `wget -c` directly: `wget -c -O models/checkpoints/NAME.safetensors "URL"`. The `-c` flag enables resume if the download is interrupted. This issue is distinct from the `--skip-prompt` interactive hang — adding `--skip-prompt` does not fix it.
 

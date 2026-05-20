@@ -25,12 +25,14 @@ Includes a bundled workflow at `qwen_image_edit-2511.json`.
 
 ### Core models — `Comfy-Org/Qwen-Image-Edit_ComfyUI` (open, split-repo)
 
-Clone with selective LFS:
+**git-lfs is unreliable for HF split repos.** Clone for structure, then wget individual files:
 ```bash
 cd models/
 GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI Qwen-Image-Edit
+# wget each model you need — reliable and resumable
 cd Qwen-Image-Edit
-git lfs pull -I "split_files/diffusion_models/*2509*" -I "split_files/diffusion_models/*2511*" -I "split_files/loras/*2509*"
+wget -c -O split_files/diffusion_models/qwen_image_edit_2509_fp8_e4m3fn.safetensors \
+  "https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI/resolve/main/split_files/diffusion_models/qwen_image_edit_2509_fp8_e4m3fn.safetensors"
 ```
 
 | Variant | Path |
@@ -52,16 +54,23 @@ git lfs pull -I "split_files/diffusion_models/*2509*" -I "split_files/diffusion_
 
 ### Qwen 2511 Lightning (distilled, 4-step) — `lightx2v/Qwen-Image-Edit-2511-Lightning` (open, split-repo)
 
+Clone for structure, then wget:
 ```bash
 cd models/
 GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning Qwen-2511-Lightning
 cd Qwen-2511-Lightning
-git lfs pull -I "*Lightning-4steps-V1.0-bf16*" -I "*lightning_comfyui_4steps*"
+wget -c -O Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors \
+  "https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning/resolve/main/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors"
 ```
 
 Key files:
 - `Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors` — what PainterQwen workflow expects
 - `qwen_image_edit_2511_fp8_e4m3fn_scaled_lightning_comfyui_4steps_v1.0.safetensors` — ComfyUI-optimized fp8
+
+### Qwen utility nodes
+
+- **Comfyui-QwenEditUtils** (in Manager registry) — additional Qwen Image Edit utilities
+- The PainterQwenImageEditPlus node handles Qwen 2509/2511/Lightning models directly
 
 ### z_image_turbo — `Comfy-Org/z_image_turbo_ComfyUI` (split-repo)
 
@@ -75,16 +84,23 @@ Already installed if PainterQwen is working. Contains: diffusion model (bf16 + n
 
 **Models:** `Comfy-Org/Wan_2.1_ComfyUI_repackaged` (open, split-repo, 3.5M downloads)
 
+Clone for structure, then wget individual files:
 ```bash
 cd models/
 GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged Wan2.1
 cd Wan2.1
-git lfs pull \
-  -I "split_files/diffusion_models/*flf2v*fp8*" \
-  -I "split_files/diffusion_models/*i2v*720p*fp8*" \
-  -I "split_files/diffusion_models/*t2v*14B*fp8*" \
-  -I "split_files/vae/*" \
-  -I "split_files/text_encoders/umt5*fp8*"
+# FLF2V — the key model for frame chaining
+wget -c -O split_files/diffusion_models/wan2.1_flf2v_720p_14B_fp8_e4m3fn.safetensors \
+  "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_flf2v_720p_14B_fp8_e4m3fn.safetensors"
+# I2V 720p fp8
+wget -c -O split_files/diffusion_models/wan2.1_i2v_720p_14B_fp8_e4m3fn.safetensors \
+  "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_720p_14B_fp8_e4m3fn.safetensors"
+# T2V 14B fp8
+wget -c -O split_files/diffusion_models/wan2.1_t2v_14B_fp8_e4m3fn.safetensors \
+  "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp8_e4m3fn.safetensors"
+# VAE
+wget -c -O split_files/vae/wan_2.1_vae.safetensors \
+  "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
 ```
 
 **Key models for 24 GB (fp8):**
@@ -117,7 +133,12 @@ Also includes: camera control (fun_camera), inpainting (fun_inp), VACE, alpha ch
 cd models/
 GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/Lightricks/LTX-Video LTX-Video
 cd LTX-Video
-git lfs pull -I "*13b*0.9.8*distilled*fp8*" -I "*2b*0.9.8*distilled*fp8*"
+# 13B distilled fp8 — best quality for 24 GB
+wget -c -O ltxv-13b-0.9.8-distilled-fp8.safetensors \
+  "https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltxv-13b-0.9.8-distilled-fp8.safetensors"
+# 2B distilled fp8 — ultrafast
+wget -c -O ltxv-2b-0.9.8-distilled-fp8.safetensors \
+  "https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltxv-2b-0.9.8-distilled-fp8.safetensors"
 ```
 
 **Key models for 24 GB:**
@@ -146,3 +167,18 @@ Models not covered yet — the Comfy-Org ecosystem is thinner for Hunyuan. The o
 **Image editing:** PainterQwenImageEdit, Florence2, IPAdapter Plus, Essentials (rembg)
 
 **Utility:** ControlNet Aux, Efficiency Nodes, rgthree-comfy, Manager
+
+**Audio:** comfyui-sound-lab, DJ_VideoAudioMixer, Jags_Audiotools (in Manager registry). For music generation (text-to-music), use the `audiocraft-audio-generation` skill (MusicGen). For TTS voiceovers, use Hermes' built-in text_to_speech tool (edge-TTS). Video models (Wan, LTX, Hunyuan) produce silent video; audio must be generated separately and mixed in.
+
+**Post-download cleanup:** After wget downloads complete, remove git-lfs scaffolding from cloned repos to save disk and avoid confusion:
+
+```bash
+# Remove .git directories (no longer needed, wget files are alongside)
+rm -rf models/Wan2.1/.git models/Qwen-Image-Edit/.git models/LTX-Video/.git models/Qwen-2511-Lightning/.git
+# Remove LFS pointer files (tiny placeholders git-lfs left behind)
+find models/ -name "*.safetensors" -size -1000c -delete
+# Remove incomplete downloads
+find models/ -name "*.part" -o -name "*.tmp" -delete
+```
+
+Then verify only real model files remain: `find models/ -name "*.safetensors" -size -1000c` should return nothing.
