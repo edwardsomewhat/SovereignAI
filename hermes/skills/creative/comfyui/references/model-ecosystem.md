@@ -73,10 +73,13 @@ The PainterQwen workflow (bundled in the custom node) references two support mod
 are **NOT** in the `Comfy-Org/Qwen-Image-Edit_ComfyUI` repo. You need these for the full
 Qwen Image Edit pipeline:
 
-| File | Role | Source (TBD) |
-|------|------|--------------|
-| `qwen_2.5_vl_7b.safetensors` | CLIP/vision encoder (type: `qwen_image`) | Not yet located — may be in `Comfy-Org/z_image_turbo_ComfyUI` or Qwen official repos |
-| `qwen_image_vae.safetensors` | VAE for Qwen Image Edit | Not yet located — z_image_turbo has a VAE but may differ |
+| File | Role | Source |
+|------|------|--------|
+| `qwen_2.5_vl_7b.safetensors` / `qwen_2.5_vl_7b_fp8_scaled.safetensors` | CLIP/vision encoder (type: `qwen_image`) | Found in community repos and user Windows builds. The `fp8_scaled` variant is smaller. If the exact filename doesn't match, create a symlink. |
+| `qwen_image_vae.safetensors` | VAE for Qwen Image Edit | **Found at `Remudl/qwen-image-vae`** on HuggingFace (open, file: `qwen-image-vae.safetensors`). Rename/symlink to `qwen_image_vae.safetensors` for workflow compatibility. Also available in some user Windows ComfyUI builds under `models/vae/`. |
+
+**Fast path:** If the user has a working Windows ComfyUI build with these models, mount the NTFS drive read-only
+and copy directly: `cp /mnt/windows_f/ComfyUI/models/clip/qwen_2.5_vl_7b_fp8_scaled.safetensors /mnt/hermes_data/comfy/models/clip/` and `cp /mnt/windows_f/ComfyUI/models/vae/qwen_image_vae.safetensors /mnt/hermes_data/comfy/models/vae/`. The Linux build may have these files already if you rsync'd from Windows.
 
 The full Qwen Image Edit workflow node chain discovered from the bundled workflow:
 1. `LoadImage` — input image(s), reference images
@@ -93,6 +96,15 @@ The workflow bundles reference subfolder paths like `2025-12-23/qwen_image_edit_
 and `2025-12-24/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors` — these are
 arbitrary date-based subfolders in the original author's setup. Create symlinks or place
 models in the expected paths.
+
+**Alternative: CheckpointLoaderSimple.** Some user workflows (e.g. Combustion-Edit-Qwen) load
+Qwen Image Edit as a standard checkpoint via `CheckpointLoaderSimple` with the model in
+`models/checkpoints/`. This is simpler than UNETLoader + CLIPLoader + VAELoader separately —
+the checkpoint loader provides MODEL, CLIP, and VAE from a single safetensors file. Copy
+your Qwen fp8mixed safetensors to `models/checkpoints/` (flat, not split_files) and reference
+it by filename. The CLIP must still be loaded separately via `CLIPLoader` with
+`qwen_2.5_vl_7b_fp8_scaled.safetensors` since the Qwen checkpoint bundles a different CLIP.
+This is the approach used in production glass-art editing workflows.
 
 ### Qwen utility nodes
 
