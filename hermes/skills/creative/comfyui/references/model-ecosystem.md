@@ -67,6 +67,33 @@ Key files:
 - `Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors` — what PainterQwen workflow expects
 - `qwen_image_edit_2511_fp8_e4m3fn_scaled_lightning_comfyui_4steps_v1.0.safetensors` — ComfyUI-optimized fp8
 
+### Qwen Image Edit support models (NOT in Comfy-Org repo)
+
+The PainterQwen workflow (bundled in the custom node) references two support models that
+are **NOT** in the `Comfy-Org/Qwen-Image-Edit_ComfyUI` repo. You need these for the full
+Qwen Image Edit pipeline:
+
+| File | Role | Source (TBD) |
+|------|------|--------------|
+| `qwen_2.5_vl_7b.safetensors` | CLIP/vision encoder (type: `qwen_image`) | Not yet located — may be in `Comfy-Org/z_image_turbo_ComfyUI` or Qwen official repos |
+| `qwen_image_vae.safetensors` | VAE for Qwen Image Edit | Not yet located — z_image_turbo has a VAE but may differ |
+
+The full Qwen Image Edit workflow node chain discovered from the bundled workflow:
+1. `LoadImage` — input image(s), reference images
+2. `CLIPLoader` — `qwen_2.5_vl_7b.safetensors`, type `qwen_image`
+3. `UNETLoader` — `qwen_image_edit_2511_FP8.safetensors`, dtype `fp8_e4m3fn`
+4. `VAELoader` — `qwen_image_vae.safetensors`
+5. `LoraLoaderModelOnly` — Lightning LoRA (strength 1.0)
+6. `ModelSamplingAuraFlow` — shift value 3
+7. `PainterQwenImageEditPlus` — prompt, mode, images → conditioning + latent
+8. `KSampler` — 4 steps (Lightning), 20-30 steps (non-Lightning)
+9. `VAEDecode` — decode latent → image
+
+The workflow bundles reference subfolder paths like `2025-12-23/qwen_image_edit_2511_FP8.safetensors`
+and `2025-12-24/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors` — these are
+arbitrary date-based subfolders in the original author's setup. Create symlinks or place
+models in the expected paths.
+
 ### Qwen utility nodes
 
 - **Comfyui-QwenEditUtils** (in Manager registry) — additional Qwen Image Edit utilities
