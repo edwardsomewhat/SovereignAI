@@ -1,7 +1,7 @@
 ---
 name: comfyui
 description: "Generate images, video, and audio with ComfyUI — install, launch, manage nodes/models, run workflows with parameter injection. Uses the official comfy-cli for lifecycle and direct REST/WebSocket API for execution."
-version: 5.1.0
+version: 5.3.0
 author: [kshitijk4poor, alt-glitch, purzbeats]
 license: MIT
 platforms: [macos, linux, windows]
@@ -46,6 +46,16 @@ for workflow execution.
   free-tier job, 1080p VRAM ceiling), Discord-compatible ffmpeg stitch.
   Authored by [@purzbeats](https://github.com/purzbeats). Load this whenever
   you're starting from an official template.
+- `remote-agent-architecture.md` — running the ComfyUI agent on a different
+  node than the GPU server. Covers Tailscale connectivity, `COMFY_HOST` env
+  var, `_common.py` patch, File Browser for output access, and the systemd
+  service pattern. Load this when the user wants autonomous agent access to
+  a remote ComfyUI instance.
+- `model-ecosystem.md` — canonical HuggingFace URLs for every model family:
+  Flux (checkpoint + CLIP/T5/VAE repos), Qwen Image Edit (2509/2511/Lightning
+  + LoRAs), Wan2.1 video (FLF2V/I2V/T2V fp8), LTX-Video (2B/13B distilled).
+  Load this before hunting down model download URLs — most models are in
+  non-obvious Comfy-Org repacks or community mirrors.
 
 **Scripts (`scripts/`):**
 
@@ -437,10 +447,22 @@ comfy model download \
   --url "https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors" \
   --relative-path models/checkpoints
 
-# Flux Dev fp8 (smaller variant, ~12 GB)
-comfy model download \
-  --url "https://huggingface.co/Comfy-Org/flux1-dev/resolve/main/flux1-dev-fp8.safetensors" \
-  --relative-path models/checkpoints
+# Flux Dev fp8 (diffusion model, ~12 GB) — use wget; comfy-cli hangs on large files
+wget -c -O models/checkpoints/flux1-dev-fp8.safetensors \
+  "https://huggingface.co/Comfy-Org/flux1-dev/resolve/main/flux1-dev-fp8.safetensors"
+
+# Flux text encoders (REQUIRED for Flux — NOT in Comfy-Org/flux1-dev)
+# Correct source: comfyanonymous/flux_text_encoders
+comfy --skip-prompt model download \
+  --url "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors" \
+  --relative-path models/clip
+comfy --skip-prompt model download \
+  --url "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors" \
+  --relative-path models/clip
+
+# Flux VAE — both BFL repos are gated; use an open community mirror
+wget -c -O models/vae/ae.safetensors \
+  "https://huggingface.co/Kijai/flux-fp8/resolve/main/flux-vae-bf16.safetensors"
 
 # CivitAI (set token first):
 comfy model download \
@@ -455,9 +477,13 @@ List installed: `comfy model list`.
 
 ```bash
 comfy node install comfyui-impact-pack             # popular utility pack
-comfy node install comfyui-animatediff-evolved     # video generation
 comfy node install comfyui-controlnet-aux          # ControlNet preprocessors
-comfy node install comfyui-essentials              # common helpers
+comfy node install comfyui-essentials              # common helpers (includes rembg)
+comfy node install ComfyUI-WanVideoWrapper         # Wan2.1 video generation
+comfy node install ComfyUI-WanVideoKsampler        # Wan2.1 sampling
+comfy node install ComfyUI-HunyuanVideoWrapper     # HunyuanVideo
+comfy node install comfyui-ltxvideo                # LTX-Video (Lightricks, fast)
+comfy node install ComfyUI-VideoHelperSuite        # video combine/split/format
 comfy node update all
 comfy node install-deps --workflow=workflow.json   # install everything a workflow needs
 ```
@@ -609,7 +635,22 @@ python3 scripts/fetch_logs.py --tail-queue --host https://cloud.comfy.org
 
 17. **Custom nodes not in Manager registry** — `comfy node install <name>` searches the ComfyUI Manager registry. If a node isn't indexed there (404), clone it from GitHub directly: `cd custom_nodes && git clone <url> && cd <dir> && .venv/bin/pip install -r requirements.txt`. Search GitHub with: `curl -s "https://api.github.com/search/repositories?q=comfyui+<keywords>&sort=stars"`.
 
-18. **Qwen Image Edit specific** — The Comfy-Org HuggingFace model repo (`Comfy-Org/Qwen-Image-Edit_ComfyUI`) is split-model only, not a custom node. The node is `princepainter/ComfyUI-PainterQwenImageEdit` (GitHub). Models are at `Comfy-Org/Qwen-Image-Edit_ComfyUI` (split format, use git clone). Florence2 is available in Manager as `comfyui-florence2`.
+18. **`--skip-prompt` required for non-interactive downloads** — `comfy model download` and other comfy-cli commands may try to read from stdin (interactive prompts). When running in background or via scripts, always add `--skip-prompt`: `comfy --skip-prompt model download --url ...`. Without it, downloads abort with \"Input is not a terminal\" or hang silently.
+
+19. **Custom node names may not match Manager registry** — `comfy node install <name>` queries the ComfyUI Manager registry, but some well-known nodes use different titles/IDs than their GitHub repo names. Examples: `ComfyUI_IPAdapter_plus` and `ComfyUI_essentials` (titles in the registry JSON) are not installable via `comfy node install comfyui-ipadapter-plus` or `comfy node install comfyui-essentials`. When `comfy node install` returns \"not found in registry\" for a known node, clone directly: `cd custom_nodes && git clone <url> && cd <dir> && ../.venv/bin/pip install -r requirements.txt`. Search the registry JSON manually with `grep -i '<keyword>' .venv/lib/.../custom-node-list.json` to discover the correct title.
+
+20. **Flux support models are NOT in Comfy-Org/flux1-dev** — That repo only contains the diffusion model (flux1-dev-fp8.safetensors) and split variants. The CLIP-L, T5 text encoder, and VAE files are in separate repos: `comfyanonymous/flux_text_encoders` (clip_l.safetensors, t5xxl_fp8_e4m3fn.safetensors) and `black-forest-labs/FLUX.1-schnell` (ae.safetensors). The `black-forest-labs/FLUX.1-dev` repo is gated and requires authentication; use the Schnell repo for the open VAE.
+
+21. **Selective LFS pull for split-model repos** — Split-model repos (pitfall #16) can exceed 50 GB total. Clone without pulling LFS blobs, then selectively pull only the variants you want:
+   ```bash
+   cd models/
+   GIT_LFS_SKIP_SMUDGE=1 git clone <hf-repo-url> <folder-name>
+   cd <folder-name>
+   git lfs pull -I "split_files/diffusion_models/*2509*" -I "split_files/loras/*2509*"
+   ```
+   The `-I` flag accepts glob patterns; use multiple `-I` flags to pull disjoint subsets. Skip `git lfs pull` entirely if you only need the JSON workflow files (e.g., Qwen-Image-Edit's bundled workflow lives in the git tree, not LFS). This saves 30–80 GB of disk for repos with many precision variants (bf16, fp8, fp4, nvfp4 all stored as separate LFS objects).
+
+22. **comfy-cli hangs silently on large HF downloads** — `comfy model download` can stall indefinitely (0 bytes transferred, process alive but idle) for files >1 GB, especially when fetching from HuggingFace. The process has network sockets open but never begins the transfer. For large checkpoints (Flux, SDXL, SD3), skip comfy-cli and use `wget -c` directly: `wget -c -O models/checkpoints/NAME.safetensors "URL"`. The `-c` flag enables resume if the download is interrupted. This issue is distinct from the `--skip-prompt` interactive hang — adding `--skip-prompt` does not fix it.
 
 ## Verification Checklist
 
