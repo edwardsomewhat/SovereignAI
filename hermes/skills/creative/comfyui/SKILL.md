@@ -56,6 +56,12 @@ for workflow execution.
   + LoRAs), Wan2.1 video (FLF2V/I2V/T2V fp8), LTX-Video (2B/13B distilled).
   Load this before hunting down model download URLs — most models are in
   non-obvious Comfy-Org repacks or community mirrors.
+- `qwen-image-edit-setup.md` — canonical Qwen Image Edit pipeline (May 2026):
+  GGUF model loading, lenML nodes for pixel-offset fix, CLIP type `qwen_image`
+  requirement, Lightning LoRA for 4-step generation, resolution alignment rules,
+  multi-image reference editing. Load this when the user wants Qwen-based image
+  editing — the pipeline has subtle requirements that differ from standard
+  SD/Flux workflows.
 
 **Scripts (`scripts/`):**
 
@@ -665,6 +671,8 @@ python3 scripts/fetch_logs.py --tail-queue --host https://cloud.comfy.org
 27. **File Browser for headless output access** — When the user wants to browse ComfyUI outputs from any tailnet node without the ComfyUI web UI, deploy [filebrowser.org](https://filebrowser.org) as a lightweight web file manager. Key setup notes: (a) disable thumbnails (`--disableThumbnails`) or the UI hangs on image preview generation, (b) **noauth mode still requires at least one user** — `--auth.method=noauth` without any created user causes a 500 error on the login page; always run `filebrowser users add <user> <password> --perm.admin` even in noauth mode, (c) minimum password length is 12 characters, (d) run as a systemd user service pointed at the ComfyUI root directory (`--root=/mnt/hermes_data/comfy`), (e) listen on 0.0.0.0 for Tailscale access. Full recipe in `references/remote-agent-architecture.md`.
 
 28. **Video models don't generate audio** — Wan2.1, LTX-Video, and HunyuanVideo produce silent video only. For soundtracks, use the `audiocraft-audio-generation` skill (MusicGen for text-to-music) or Hermes' built-in TTS. ComfyUI audio nodes (`comfyui-sound-lab`, `DJ_VideoAudioMixer`) mix/process existing audio but don't generate it natively.
+
+29. **Qwen Image Edit has its own pipeline** — Qwen editing is not standard SD img2img. It requires specific nodes, a GGUF model (or CheckpointLoaderSimple for safetensors), CLIP type `qwen_image` (not `stable_diffusion`), a Lightning LoRA for 4-step generation, and lenML's TextEncodeQwenImageEditAdv to fix pixel offset. Resolution must be 32-aligned at ~1024px. The full canonical pipeline is in `references/qwen-image-edit-setup.md`. Community workflows (CivitAI, Reddit, GitHub) often use mismatched CLIP types or wrong loader nodes — test with a minimal known-good workflow first before assuming a community workflow is correct.
 
 ## Verification Checklist
 

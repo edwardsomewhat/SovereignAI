@@ -30,12 +30,28 @@ All image/video generation stays local. External APIs only for final QC pass if 
 
 ## Infrastructure
 
-- **Orchestrator**: sovereign, Hermes Agent
-- **Art Director Agent**: sovereign, Hermes Agent subagent with vision model
-- **ComfyUI**: conchai, RTX 3090 24GB, systemd on :8188
-- **Model server**: llama.cpp on sovereign (turboQuant/MTP), switched from Ollama
+- **Orchestrator**: sovereign, Hermes Agent (deepseek-v4-pro or similar for heavy reasoning)
+- **Art Director Agent**: sovereign, Hermes Agent subagent with vision-capable model
+- **ComfyUI**: conchai, RTX 3090 24GB, systemd on :8188, Tailscale IP 100.69.153.16
+- **Model server**: llama.cpp on sovereign (turboQuant/MTP), switched from Ollama for larger context windows
 - **File access**: File Browser at conchai:8190 (fated/Strange112263!)
-- **Models available**: 584GB — Flux Dev, SDXL fine-tunes, Qwen 2509/2511/Lightning, z-image turbo, Wan2.1 FLF2V/I2V/T2V, LTX 13B/2B, 6 Qwen LoRAs
+- **Models available**: 584GB — Flux Dev fp8, SDXL + 5 fine-tunes (epicrealism, dreamshaper, etc.), Qwen Image Edit 2509/2511/Lightning (GGUF + safetensors), z-image turbo, Wan2.1 FLF2V/I2V/T2V fp8, LTX-Video 13B/2B distilled fp8, 6× Qwen LoRAs (Relight, Multiple-angles, Fusion, Anything2Real, Light-Migration, White-to-Scene)
+- **Workflows**: Combustion-Edit-Qwen, Combustion-Edit, Glass_Crop_Flo_v1, glass_production, Qwen 2509 V2, qwen_editing_workflow (all in user/default/workflows/)
+- **Custom nodes**: 30 installed including Qwen-specific (PainterQwen, lenML adv, QwenVL, TextEncodeAdvanced) and video (WanWrapper, HunyuanVideoWrapper, LTXVideo, VideoHelperSuite)
+
+## Qwen Mastery Goals
+
+- Master Qwen Image Edit 2509/2511 pipeline (canonical: GGUF → lenML TextEncodeAdv + built-in TextEncode → CFGNorm → KSampler Efficient, 4 steps with Lightning LoRA)
+- Research and integrate future Qwen image models
+- Master Qwen TTS and STT models for voice interaction
+- Florence2 already on ConchAI for aesthetic QC; consider Florence on nano when available
+
+## Hermes Memory & Config
+
+- Memory char limit configurable in ~/.hermes/config.yaml: `memory.memory_char_limit` (default 2200, bumped to 5000)
+- User profile limit: `memory.user_char_limit` (default 1375, bumped to 2500)
+- Memory = persistent facts (IPs, passwords, model paths, preferences). Skills = procedures and architectures.
+- Clean memory periodically — move stale infrastructure notes to skills, keep memory for active operational facts
 
 ## Vision Models
 

@@ -16,7 +16,11 @@ for s in json.load(sys.stdin).get('siblings',[]):
 
 If files are under `split_files/` directories, it's a split model.
 
-## Download Recipe
+## Download Recipe — Preferred: wget (reliable)
+
+**git-lfs `-I` glob patterns are unreliable on HF repos** — they silently match
+nothing, leaving files as 136-byte LFS pointers. `git lfs fetch --all` hangs
+with 0 bytes transferred. The reliable method is wget for individual files:
 
 ```bash
 cd ComfyUI/models
@@ -24,12 +28,11 @@ cd ComfyUI/models
 # 1. Clone WITHOUT pulling LFS blobs (repo structure only, seconds)
 GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/Comfy-Org/REPO_NAME local_name
 
-# 2. Selectively pull only the variants you need (saves 30-80 GB)
+# 2. Download individual model files via wget — resumable and reliable
 cd local_name
-git lfs pull \
-  -I "split_files/diffusion_models/*fp8*" \
-  -I "split_files/vae/*" \
-  -I "split_files/text_encoders/umt5*fp8*"
+wget -c -O split_files/diffusion_models/model.safetensors \
+  "https://huggingface.co/Comfy-Org/REPO_NAME/resolve/main/split_files/diffusion_models/model.safetensors"
+# Repeat for each precision variant you need
 
 # 3. Verify weights are real (not 136-byte LFS pointers)
 python3 -c "
@@ -38,15 +41,24 @@ for f in os.listdir('split_files/diffusion_models'):
     sz = os.path.getsize(f'split_files/diffusion_models/{f}')
     print(f'{\"REAL\" if sz > 1e6 else \"LFS_PTR\"} {sz/1e9:.1f}GB {f}')
 "
+
+# 4. Clean up LFS scaffolding
+rm -rf .git
+find . -name "*.safetensors" -size -1000c -delete
 ```
 
-**Why selective pull?** Many Comfy-Org repos ship bf16, fp16, fp8, fp4, nvfp4,
-and GGUF variants of the same model as separate LFS objects. Pulling
-everything wastes 50-150 GB. Target only the precision your GPU can run.
+## Download Recipe — Fallback: git-lfs (unreliable, may work on small repos)
 
-The `-I` flag accepts glob patterns. Multiple `-I` flags pull disjoint
-subsets. Skip `git lfs pull` entirely if you only need JSON workflow files
-(e.g., Qwen-Image-Edit's bundled workflow lives in the git tree, not LFS).
+Only try this for repos with <5 files. Still expect failures.
+
+```bash
+cd local_name
+git lfs pull \
+  -I "split_files/diffusion_models/*fp8*" \
+  -I "split_files/vae/*"
+# WARNING: globs often match nothing. Verify with step 3.
+# If files remain LFS_PTR, fall back to wget.
+```
 
 ## Known Split Repos
 
