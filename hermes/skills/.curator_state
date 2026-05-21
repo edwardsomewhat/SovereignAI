@@ -1,8 +1,8 @@
 {
-  "last_report_path": "/home/fated/.hermes/logs/curator/20260514-152733",
+  "last_report_path": "/home/fated/.hermes/logs/curator/20260521-220508",
   "last_run_at": "2026-05-21T22:05:08.337952+00:00",
-  "last_run_duration_seconds": 0.330665,
-  "last_run_summary": "auto: no changes",
+  "last_run_duration_seconds": 444.897116,
+  "last_run_summary": "auto: no changes; llm: ---\n\n## Human Summary\n\n**Input:** 9 agent-created skills across 7 categories.\n\n**Clusters identified and processed:**\n\n1. **`training-data-capture` + `training-data-collector`** — Two skills describing the exact same pipeline (FastAPI proxy…\narchived 3 skill(s):\n  • training-data-collector → training-data-capture\n  • signal-cli-setup — pruned (stale)\n  • telegram-bot-setup — pruned (stale)\nfull report: hermes curator status\nkeep an umbrella stable: hermes curator pin training-data-capture",
   "last_run_summary_shown_at": "2026-05-14T15:27:33.776823+00:00",
   "paused": false,
   "run_count": 4
