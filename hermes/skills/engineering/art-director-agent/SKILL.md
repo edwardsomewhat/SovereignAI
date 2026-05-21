@@ -33,7 +33,7 @@ All image/video generation stays local. External APIs only for final QC pass if 
 - **Orchestrator**: sovereign, Hermes Agent (deepseek-v4-pro or similar for heavy reasoning)
 - **Art Director Agent**: sovereign, Hermes Agent subagent with vision-capable model
 - **ComfyUI**: conchai, RTX 3090 24GB, systemd on :8188, Tailscale IP 100.69.153.16
-- **Model server**: llama.cpp on sovereign (turboQuant/MTP), switched from Ollama for larger context windows
+- **Model server**: Ollama on hq-ai (100.84.92.74:11434/v1, Tailscale). llama.cpp available on sovereign for future use.
 - **File access**: File Browser at conchai:8190 (fated/Strange112263!)
 - **Models available**: 584GB — Flux Dev fp8, SDXL + 5 fine-tunes (epicrealism, dreamshaper, etc.), Qwen Image Edit 2509/2511/Lightning (GGUF + safetensors), z-image turbo, Wan2.1 FLF2V/I2V/T2V fp8, LTX-Video 13B/2B distilled fp8, 6× Qwen LoRAs (Relight, Multiple-angles, Fusion, Anything2Real, Light-Migration, White-to-Scene)
 - **Workflows**: Combustion-Edit-Qwen, Combustion-Edit, Glass_Crop_Flo_v1, glass_production, Qwen 2509 V2, qwen_editing_workflow (all in user/default/workflows/)
@@ -53,14 +53,32 @@ All image/video generation stays local. External APIs only for final QC pass if 
 - Memory = persistent facts (IPs, passwords, model paths, preferences). Skills = procedures and architectures.
 - Clean memory periodically — move stale infrastructure notes to skills, keep memory for active operational facts
 
-## Vision Models
+## Vision Pipeline (ACTIVE)
 
-- Florence2 for aesthetic QC (already on ConchAI)
-- Qwen VL for agent vision (need to deploy)
-- Qwen3+ 9B+ for main agent reasoning
+Vision is configured via Ollama on hq-ai (100.84.92.74:11434/v1). Model: `qwen3-vl:8b` (6.1GB). Hermes `auxiliary.vision` config routes `vision_analyze()` calls to this endpoint. The agent can now see generated images by passing the file path + a question to vision_analyze — description text is injected into context for reasoning. All local, no external API.
+
+## Ollama Models on hq-ai (100.84.92.74)
+
+Accessible over Tailscale at http://100.84.92.74:11434/v1. SSH requires Tailscale browser re-auth — use the HTTP API directly for model queries.
+
+- `qwen3-vl:8b` — 6.1GB, vision
+- `hermes3:8b` — 4.7GB, general
+- `deepseek-r1:14b` — 9.0GB, reasoning
+- `mannix/gemma4-98e-v5-coder:Q4_K_S` — 12.2GB
+
+## Vision Model
+
+Configured via `auxiliary.vision` in config.yaml:
+- **Provider**: ollama
+- **Model**: qwen3-vl:8b (6.1GB)
+- **Base URL**: http://100.84.92.74:11434/v1 (HQ-AI over Tailscale)
+- **Usage**: `vision_analyze` tool routes image+question to qwen3-vl, returns text description, main model continues reasoning.
+
+**Limitation**: qwen3-vl:8b has no pop-culture knowledge. It will describe images accurately in terms of visual elements (colors, clothing, composition) but cannot identify specific celebrities, wrestlers, or characters by name. For identity verification, the agent must compare against reference images rather than relying on the VL model to recognize individuals.
 
 ## Key URLs
 
-- ComfyUI: http://100.69.153.16:8188
-- File Browser: http://100.69.153.16:8190
+- ComfyUI: http://100.69.153.16:8188 (conchai)
+- File Browser: http://100.69.153.16:8190 (login: fated/Strange112263!)
 - COMFY_HOST env var on sovereign: http://100.69.153.16:8188
+- Ollama API (HQ-AI): http://100.84.92.74:11434/v1

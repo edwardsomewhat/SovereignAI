@@ -1,113 +1,75 @@
-# Qwen Image Edit Pipeline — Canonical Setup (May 2026)
+# Qwen Image Edit — Working Pipeline (May 2026)
 
-> Researched from community sources: princepainter/ComfyUI-PainterQwenImageEdit,
-> lenML/comfyui_qwen_image_edit_adv, Comfy-Org/HuggingFace model repos, and
-> user field experience (Windows → Linux migration).
+## The Pipeline That Works
 
-## Required Custom Nodes
+After 10+ failed attempts with GGUF, Lightning LoRA, lenML nodes, and KSampler (Efficient), the simple pipeline is what produces photorealistic results:
 
-| Node | Source | Purpose |
-|------|--------|---------|
-| ComfyUI-PainterQwenImageEdit | princepainter GitHub | Base editing node (PainterQwenImageEditPlus) |
-| comfyui_qwen_image_edit_adv | lenML GitHub | Fixes pixel offset, provides TextEncodeQwenImageEditAdv, scaling nodes |
-| ComfyUI-GGUF | Manager registry | GGUF model loading (preferred for Qwen) |
-| Comfyui-QwenEditUtils | Manager registry | Text encoding utilities |
-| ComfyUI_QwenVL | GitHub clone | Vision-language integration |
-| ComfyUi-TextEncodeQwenImageEditAdvanced | GitHub clone | Advanced text encoding |
-| Comfyui-CustomizeTextEncoder-Qwen-image | GitHub clone | Custom text encoder |
+### Models Required
+- `qwen_image_edit_2511_fp8mixed.safetensors` — in `models/checkpoints/` (flat safetensors, NOT split_files)
+- `qwen_2.5_vl_7b_fp8_scaled.safetensors` — in `models/clip/` (8.8GB)
+- `qwen_image_vae.safetensors` — in `models/vae/` (243MB)
 
-## Required Models
+### Custom Nodes Required
+- `ComfyUi-TextEncodeQwenImageEditAdvanced` — provides `TextEncodeEditAdvancedDual` node
+- `ComfyUI_QwenVL` — Qwen VL integration
 
-### Primary (GGUF — preferred path)
-- `Qwen-Image-Edit-2511-Q4_K_M.gguf` or `Q5_1.gguf` → `models/unet/`
-- Source: community GGUF conversions or Windows build (ComfyUI works with GGUF via LoaderGGUF node)
-
-### Alternative (safetensors — flatter path)
-- `qwen_image_edit_2511_fp8mixed.safetensors` → `models/checkpoints/`
-- Source: Comfy-Org/Qwen-Image-Edit_ComfyUI (split repo) or flat copies from Windows build
-
-### Support models (required regardless of format)
-- `qwen_2.5_vl_7b_fp8_scaled.safetensors` → `models/clip/`
-  - Source: Windows build or community repos. NOT in Comfy-Org Qwen repo.
-- `qwen_image_vae.safetensors` → `models/vae/`
-  - Source: remudl/qwen-image-vae (HF) or Windows build
-
-### Lightning LoRA (enables 4-step generation)
-- `Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors` → `models/loras/`
-  - Source: lightx2v/Qwen-Image-Edit-2511-Lightning (HF, 252k downloads)
-  - Without this: use 20+ sampling steps. With it: 4 steps.
-
-## Canonical Workflow
-
-```
-1. LoaderGGUF
-   └─ unet_name: "Qwen-Image-Edit-2511-Q5_1.gguf"
-        ↓ MODEL
-2. LoraLoaderModelOnly
-   └─ lora_name: "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors"
-   └─ strength_model: 1
-        ↓ MODEL+LORA
-3. CLIPLoader
-   └─ clip_name: "qwen_2.5_vl_7b_fp8_scaled.safetensors"
-   └─ type: "qwen_image"  ← CRITICAL: NOT "stable_diffusion"
-        ↓ CLIP
-4. VAELoader
-   └─ vae_name: "qwen_image_vae.safetensors"
-        ↓ VAE
-5. LoadImage → input image(s)
-6. QwenImageEditSimpleScale (lenML)
-   └─ resolution: 1024, alignment: 32
-7a. TextEncodeQwenImageEditAdv (lenML) — for POSITIVE + LATENT
-   └─ image, clip, model, prompt
-   └─ Outputs: CONDITIONING (index 0), LATENT (index 1)
-   └─ NOTE: only 2 outputs — NO negative conditioning!
-7b. TextEncodeQwenImageEdit (built-in) — for NEGATIVE only
-   └─ Same image, clip, model; prompt = what to AVOID
-   └─ Output: CONDITIONING (index 0)
-8. CFGNorm
-   └─ model ("4", 0), strength: 1
-        ↓ normalized MODEL
-9. KSampler (Efficient) — NOT standard KSampler
-   └─ model: CFGNorm output, positive: node 7a[0], negative: node 7b[0], latent: node 7a[1]
-   └─ steps: 4, cfg: 1, sampler: euler, scheduler: simple
-   └─ denoise: 1, preview_method: "none", vae_decode: "false"
-   └─ REQUIRED inputs that standard KSampler lacks: denoise, preview_method, vae_decode
-        ↓ LATENT
-10. VAEDecode → SaveImage
+### Canonical Workflow (API Format)
+```json
+{
+  "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "qwen_image_edit_2511_fp8mixed.safetensors"}},
+  "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors", "type": "qwen_image"}},
+  "3": {"class_type": "VAELoader", "inputs": {"vae_name": "qwen_image_vae.safetensors"}},
+  "4": {"class_type": "LoadImage", "inputs": {"image": "input_image.png"}},
+  "5": {"class_type": "TextEncodeEditAdvancedDual", "inputs": {
+    "image1": ["4", 0],
+    "clip": ["2", 0],
+    "positive": "edit description here",
+    "negative": "what to avoid",
+    "vl_megapixels": 1.0,
+    "max_images_allowed": "1"
+  }},
+  "6": {"class_type": "EmptyLatentImage", "inputs": {"width": 1024, "height": 1024, "batch_size": 1}},
+  "7": {"class_type": "KSampler", "inputs": {
+    "model": ["1", 0],
+    "positive": ["5", 0],
+    "negative": ["5", 1],
+    "latent_image": ["6", 0],
+    "seed": 42, "steps": 15, "cfg": 6,
+    "sampler_name": "euler", "scheduler": "normal",
+    "denoise": 0.5
+  }},
+  "8": {"class_type": "VAEDecode", "inputs": {"samples": ["7", 0], "vae": ["3", 0]}},
+  "9": {"class_type": "SaveImage", "inputs": {"filename_prefix": "qwen_edit", "images": ["8", 0]}}
+}
 ```
 
-## Critical Pitfalls
+## Key Settings
+- **Loader**: `CheckpointLoaderSimple` (NOT UNETLoader, NOT UnetLoaderGGUF)
+- **CLIP type**: `qwen_image` (NOT `stable_diffusion`)
+- **denoise**: 0.4–0.5 for edits that preserve original composition. Higher values (0.85) give the model too much freedom and can produce completely unrelated outputs.
+- **Steps**: 15. Higher steps don't improve quality meaningfully.
+- **CFG**: 6. Standard value, works well.
+- **Latent source**: `EmptyLatentImage` (NOT VAE-encoded input image). Qwen generates its own latent from the prompt + reference image via TextEncodeEditAdvancedDual.
 
-1. **CLIP type MUST be `qwen_image`** — Using `stable_diffusion` silently produces wrong results. The model loads fine but the text/vision encoding is completely wrong. This is the #1 cause of "workflow runs but output is garbage."
+## What DOESN'T Work (Tested and Failed)
 
-2. **Resolution alignment** — Width and height must be multiples of 32. Optimal around 1024px. The lenML QwenImageEditSimpleScale handles this automatically.
+| Approach | Result | Why |
+|----------|--------|-----|
+| GGUF model (UnetLoaderGGUF) | 8-bit retro pixel art | Quantization degrades Qwen's output to pixelation |
+| Lightning LoRA (4-step) | Pixelated output | LoRA incompatible with some Qwen model versions |
+| lenML TextEncodeQwenImageEditAdv | Wrong wiring | Needs model input that doesn't exist; different output indices |
+| KSampler (Efficient) | Validation errors | Needs CFGNorm, optional_vae, vae_decode, preview_method |
+| UNETLoader with fp8 safetensors | Pixelated output | UNETLoader doesn't handle Qwen's conditioning the same way |
+| denoise > 0.7 | Unrelated output | Too much freedom; model generates new scenes instead of editing |
 
-3. **Lightning LoRA is essential** — Without it, you need 20+ steps and results may still be inconsistent. The Lightning LoRA distills the model to 4-step generation while maintaining quality.
+## Multi-Image Reference Editing\n\nTextEncodeEditAdvancedDual supports up to 3 reference images via `image1`, `image2`, `image3` inputs. This is the recommended way to transfer identity — provide the actual person/object photo as a second image:\n\n```json\n\"5\": {\"class_type\": \"TextEncodeEditAdvancedDual\", \"inputs\": {\n  \"image1\": [\"4\", 0],   // the image to edit\n  \"image2\": [\"5\", 0],   // the reference photo to match\n  \"max_images_allowed\": \"2\",\n  \"vl_megapixels\": 1.0,\n  ...\n}}\n```\n\nThen prompt: \"make image1 look exactly like the person in image2. match their face, hair, and features precisely.\"\n\n**Important**: `max_images_allowed` must match the number of images wired. Available values: \"0\", \"1\", \"2\", \"3\". The image input names are `image1`, `image2`, `image3` (NOT `image`).\n\n## Qwen VL Limitations
+The Qwen vision-language model interprets text literally. It has NO pop-culture knowledge. Examples:
+- "macho man" → Spanish "masculine man" → sombreros and mariachi
+- "wizard" is understood generically
+- Celebrity names are not recognized
 
-4. **Pixel offset without lenML** — The built-in ComfyUI TextEncodeQwenImageEdit applies forced scaling that shifts pixel positions. lenML's TextEncodeQwenImageEditAdv separates scaling from encoding and fixes this.
+**Solution**: Use reference images (IPAdapter) for identity transfer rather than text descriptions of specific people.
 
-5. **GGUF over safetensors** — Qwen models load faster and use less VRAM in GGUF format. The UnetLoaderGGUF node loads them directly. If using safetensors, CheckpointLoaderSimple works but loads the full precision weights.
-
-6. **Multi-image reference** — The node supports image1 through image10 inputs. More reference images improve editing accuracy. For identity transfer (e.g., making someone look like Macho Man), include 1-3 reference portraits.
-
-7. **Workflow compatibility** — Workflows built for Qwen 2509 may not work with 2511 and vice versa. The CLIP type and model architecture differ. 2511 is the recommended version (better consistency, integrated LoRA support).
-
-8. **Dual text-encoder pattern** — TextEncodeQwenImageEditAdv (lenML) provides POSITIVE + LATENT (2 outputs). A separate built-in TextEncodeQwenImageEdit provides NEGATIVE conditioning. Using only the lenML node with a 3-output assumption causes `tuple index out of range` in KSampler validation. The negative text encoder prompt should DESCRIBE what to remove/avoid.
-
-9. **KSampler (Efficient) required inputs** — Standard KSampler lacks `denoise`, `preview_method`, and `vae_decode` inputs that KSampler (Efficient) requires. Set denoise=1, preview_method="none", vae_decode="false" when doing VAE decode separately. The lenML demo workflow uses KSampler (Efficient), not standard KSampler.
-
-10. **CFGNorm required** — The model output must pass through a CFGNorm node (strength=1) before reaching the sampler. Without it, the GGUF-loaded model's conditioning format doesn't match what KSampler (Efficient) expects.
-
-11. **ComfyUI restart required for new nodes** — After installing custom nodes via git clone, ComfyUI must be restarted (`systemctl --user restart comfyui.service`) for them to appear in the object_info registry. Verify with `curl http://localhost:8188/object_info | python3 -c "import sys,json; d=json.load(sys.stdin); print([k for k in d if 'TextEncodeQwen' in k])"`.
-
-12. **Node name mismatch** — The lenML demo uses `LoaderGGUF` but the ComfyUI-GGUF node registers as `UnetLoaderGGUF`. Always verify node class_type against the server's `/api/object_info` before building workflows.
-
-## Model Source URLs
-
-All models available from HuggingFace. Key repos:
-- `Comfy-Org/Qwen-Image-Edit_ComfyUI` (split repo, not gated) — diffusion models + LoRAs
-- `lightx2v/Qwen-Image-Edit-2511-Lightning` (not gated, 252k downloads) — Lightning models
-- `remudl/qwen-image-vae` (not gated) — VAE
-- Community GGUF conversions for the GGUF format
-
-The Comfy-Org repo is split-model — use wget for individual files (git-lfs glob patterns don't work).
+## Model Source
+- All three models (checkpoint, CLIP, VAE) can be found in existing Windows ComfyUI builds under `models/checkpoints/`, `models/clip/`, and `models/vae/`
+- The Comfy-Org split repo (`Comfy-Org/Qwen-Image-Edit_ComfyUI`) contains the diffusion models and LoRAs in split_files format, but NOT the CLIP or VAE

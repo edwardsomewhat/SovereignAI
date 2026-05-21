@@ -134,11 +134,11 @@ auxiliary:
     timeout: 120
   vision:
     api_key: ''
-    base_url: ''
+    base_url: http://100.84.92.74:11434/v1
     download_timeout: 30
     extra_body: {}
-    model: ''
-    provider: auto
+    model: qwen3-vl:8b
+    provider: ollama
     timeout: 120
   web_extract:
     api_key: ''
