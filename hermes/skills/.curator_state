@@ -1,9 +1,9 @@
 {
   "last_report_path": "/home/fated/.hermes/logs/curator/20260514-152733",
-  "last_run_at": "2026-05-14T15:27:33.776823+00:00",
+  "last_run_at": "2026-05-21T22:05:08.337952+00:00",
   "last_run_duration_seconds": 0.330665,
-  "last_run_summary": "auto: no changes; llm: error: Model qwen3.5-27b-claude-opus has a context window of 48,000 tokens, which is below the minimum 64,000 required by Hermes Agent.  Choose a model with at least 64K context, or set model.context_length in config.yaml to override.",
+  "last_run_summary": "auto: no changes",
   "last_run_summary_shown_at": "2026-05-14T15:27:33.776823+00:00",
   "paused": false,
-  "run_count": 3
+  "run_count": 4
 }
