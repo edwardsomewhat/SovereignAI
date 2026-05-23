@@ -127,7 +127,19 @@ The pipeline stalled because qwen3.5:9b generates thinking tokens separately fro
 ```
 The pipeline code does `result.get("response", "").strip()` — always gets `""`. The `thinking` field has 2000+ chars of perfectly reasonable analysis that the pipeline never sees. Each summarization takes 20-45 seconds (the model is genuinely generating), but produces nothing usable. After processing all files, every summary is empty and grading deletes everything.
 
-**Fix:** Use a model without thinking mode (hermes3:8b, deepseek-coder-v2:16b) or modify the pipeline to fall back to `result.get("thinking", "")` if `response` is empty.
+**Fix:** Use a model without thinking mode (hermes3:8b, deepseek-coder-v2:16b) or modify the pipeline to fall back to `result.get("thinking", "")` if `response` is empty. Code fix for `call_ollama()`:
+
+```python
+def call_ollama(prompt, system=None):
+    # ... existing code ...
+    result = json.loads(resp.read())
+    # Handle thinking models (qwen3.5, deepseek-r1, etc.) that put output
+    # in the "thinking" field instead of "response"
+    response = result.get("response", "") or result.get("thinking", "")
+    return response.strip()
+```
+
+When patching, note that the pipeline may already have this fix applied (check with `grep "thinking" ~/training_pipeline.py`).
 
 ## Operational Notes
 

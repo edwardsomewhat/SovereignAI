@@ -95,6 +95,7 @@ The `sharegpt_format` column stores conversations in ShareGPT format:
 
 ## Pitfalls
 
+- **Thinking-model silent failure (qwen3.5:9b, deepseek-r1, etc.)**: Ollama thinking models put output in `thinking` field, not `response`. Any pipeline calling `result.get("response", "")` gets empty strings with NO error — the API responds successfully but produces nothing usable. Fix: fall back to `response = result.get("response", "") or result.get("thinking", "")`. See `references/session-mining-pipeline.md` for full details.
 - **vLLM must be running on port 8020** for the proxy to forward requests. Without vLLM, the proxy returns "Internal Server Error"
 - The proxy uses `network_mode: "host"` in Docker — this lets it reach vLLM on `127.0.0.1:8020` and PostgreSQL on `127.0.0.1:5432`
 - PostgreSQL data persists at `/mnt/hermes_data/collector/pgdata/` — back up this directory to preserve collected data
