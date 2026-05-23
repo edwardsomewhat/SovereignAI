@@ -160,13 +160,13 @@
     "created_at": "2026-05-23T16:35:38.412036+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-05-23T16:35:57.871061+00:00",
-    "last_used_at": null,
-    "last_viewed_at": null,
+    "last_used_at": "2026-05-23T20:35:05.437601+00:00",
+    "last_viewed_at": "2026-05-23T20:35:05.436631+00:00",
     "patch_count": 2,
     "pinned": false,
     "state": "active",
-    "use_count": 0,
-    "view_count": 0
+    "use_count": 1,
+    "view_count": 1
   },
   "tailscale-mcp": {
     "archived_at": null,
