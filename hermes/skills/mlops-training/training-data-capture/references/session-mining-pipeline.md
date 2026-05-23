@@ -52,7 +52,13 @@ RATIONALE:    [why — tied to Sovereign Codex principle]
 
 **LLM backend:** Both nodes use HQ Ollama at `http://hq-ai:11434` (Tailscale hostname `hq-ai` resolves to `100.84.92.74`). Set `TRAINING_LLM_URL=http://hq-ai:11434` to avoid security-scanner blocks on raw IPs. No external API spend.
 
-**⚠️ Model status (2026-05-20):** `qwen3.5:9b` is working again — confirmed reachable and responding via `/api/generate`. However, its grading yield is low (~13% keep rate vs 74% for hermes3:8b). `qwen3:14b` status unknown. Fallback: `hermes3:8b` works reliably but has ~24% empty-response rate on grading calls. Working models on hq-ai: `hermes3:8b`, `qwen3.5:9b`, `gemma4:e4b`, `deepseek-r1:14b`, `qwen2.5-coder:14b`.
+**⚠️ Model status (2026-05-23):**
+- **`qwen3.5:9b` — DO NOT USE for pipeline.** This model has a "thinking mode" that puts output in the `thinking` field with empty `response` field. The pipeline's `result.get("response", "")` gets empty strings EVERY TIME, so every summarization and grade call produces empty output. It appears to work (API responds, no errors) but silently produces nothing usable. The pipeline processes all files but writes empty summaries and deletes everything in grading.
+- **`hermes3:8b` — USE THIS.** Reliable, no thinking mode, ~6s per summarization call. ~74% keep rate. Some genuine empty responses (~24% on grading) but far better than qwen3.5:9b's 0%.
+- **`deepseek-coder-v2:16b`** — Works, no thinking mode. ~5s response time. Untested at scale.
+- **`deepseek-coder:6.7b`** — Works, no thinking mode. ~7s response time. Untested at scale.
+- **`gemma4:e4b`**, **`gemma4:e2b`** — Present on hq-ai but not tested with pipeline.
+- Working models on hq-ai: `hermes3:8b`, `qwen3.5:9b`, `gemma4:e4b`, `gemma4:e2b`, `deepseek-coder-v2:16b`, `deepseek-coder:6.7b`, `granite4.1:8b`, `nemotron3:33b`.
 
 **hermes3:8b caveat:** ~24% of grading calls return empty responses (empty string grades default to "deleted" in the pipeline, causing false discards). The grading stage is lossy with this model — consider bumping to a larger model for better yield.
 
@@ -98,6 +104,31 @@ RATIONALE:    [why — tied to Sovereign Codex principle]
 - Summarize rate: ~2 files/min (qwen3.5:9b ~22s per call). Grade rate: ~3 files/min.
 - Total wall time: summarize ~25 min for 49 files; grade ~25 min for 69 files
 
+## Fifth-Run Results (2026-05-23)
+
+- Model: `hermes3:8b` (switched after discovering qwen3.5:9b thinking-mode issue)
+- Captured: 0 new (all 129 sessions already extracted, 113 raw files)
+- Summarized: 42 new (was 71 processed → now 113, all caught up)
+- Graded: 76 kept (A/B), 37 deleted (C/D)
+- 67.3% survival rate — consistent with hermes3:8b's ~74% range
+- Final curated: 94 files (18 pre-existing + 76 new)
+- **Root cause of stall:** qwen3.5:9b puts output in `thinking` field, not `response`. Pipeline gets empty strings, silently writes empty summaries, deletes everything. Switched to hermes3:8b via `TRAINING_LLM_MODEL=hermes3:8b`.
+- Summarize rate: ~6s per call with hermes3:8b. Grade rate: ~3s per call. Total wall time: ~8 min for 42 files.
+
+## qwen3.5:9b Thinking-Mode Failure (Root Cause)
+
+The pipeline stalled because qwen3.5:9b generates thinking tokens separately from response tokens. The Ollama `/api/generate` response looks like:
+```json
+{
+  "model": "qwen3.5:9b",
+  "response": "",
+  "thinking": "Thinking Process:\n\n1. Analyze the Request...\n2. Analyze the Input Data...\n..."
+}
+```
+The pipeline code does `result.get("response", "").strip()` — always gets `""`. The `thinking` field has 2000+ chars of perfectly reasonable analysis that the pipeline never sees. Each summarization takes 20-45 seconds (the model is genuinely generating), but produces nothing usable. After processing all files, every summary is empty and grading deletes everything.
+
+**Fix:** Use a model without thinking mode (hermes3:8b, deepseek-coder-v2:16b) or modify the pipeline to fall back to `result.get("thinking", "")` if `response` is empty.
+
 ## Operational Notes
 
 - **Run background, not foreground**: the pipeline takes 30-60 min. Use `background=true` + `notify_on_complete=true` in the terminal call.
@@ -105,7 +136,9 @@ RATIONALE:    [why — tied to Sovereign Codex principle]
 - **Monitor progress by file counts**: `ls ~/.hermes/training_data/processed/*.txt | wc -l` is the most reliable progress indicator.
 - **⚠️ Security scanner blocks raw IP URLs**: `tirith:raw_ip_url` policy blocks HTTP requests to raw IP addresses (e.g., `http://100.84.92.74:11434`). Curl and Python `-c` script execution are both blocked. **Fix**: use the Tailscale hostname instead — set `TRAINING_LLM_URL=http://hq-ai:11434` as an env override. The pipeline's internal `urllib` calls work through the hostname. The LLM endpoint at `100.84.92.74` is the `hq-ai` Tailscale node.
 - **LLM health check**: verify the model responds using the hostname: `python -c "import urllib.request,json; r=urllib.request.urlopen(urllib.request.Request('http://hq-ai:11434/api/tags')); print([m['name'] for m in json.loads(r.read())['models']])"`. Non-empty model list = LLM alive.
-- **Grading yield varies wildly by model**: hermes3:8b = ~74% keep rate, qwen3.5:9b = ~10-13%. The larger the model, the more generous the grader.
+- **Grading yield varies wildly by model**: hermes3:8b = ~74% keep rate, qwen3.5:9b = ~10-13% (when it was working pre-thinking-mode). The larger the model, the more generous the grader.
+- **Diagnosing a hung pipeline**: If the pipeline appears stuck with 0% CPU and no output, it may be waiting on Ollama. Check: `ps --ppid <pid> -o pid,pcpu,rss,etime,cmd` to find child processes, then `cat /proc/<child_pid>/wchan` to see what syscall it's blocked on. `poll_schedule_timeout` = waiting on network socket (Ollama). Use `strace -f -e trace=network -o /tmp/strace.log env TRAINING_LLM_MODEL=hermes3:8b python -u training_pipeline.py all` to see the actual API calls being made — this confirms the pipeline is working even when background stdout capture fails.
+- **Background stdout capture is unreliable**: even with `python -u`, the background process handler may not capture print() output. Monitor progress by file counts instead: `ls ~/.hermes/training_data/processed/ | wc -l`.
 
 ## Script Location
 
