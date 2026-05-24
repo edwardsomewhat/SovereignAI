@@ -75,6 +75,8 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 
 `stage_summarize()` checks `processed/{stem}.txt` to skip already-summarized sessions. But `stage_grade()` **deletes** processed files after grading (A/B → moves to curated; C/D → deleted). On the next run, summarize re-processes ALL raw files — including the 90%+ that were already graded A/B. This wastes ~100+ LLM calls per run.
 
+**Observed behavior note (24 May 2026):** In a run with 129 raw files and 0 processed, only 18 files were actually summarized+graded — not all 129. The pipeline's final output reported "Graded: 0 kept, 18 deleted." This may indicate the bug has been partially mitigated (e.g., a hidden check or limit), or it depends on specific conditions. The full re-summarization behavior described above should be considered the worst case; observed behavior may be less severe.
+
 ### Fix
 In `stage_summarize()`, add a curated-path skip before the LLM call:
 
@@ -95,7 +97,7 @@ See `references/re-summarization-bug.md` for full root-cause analysis and reprod
 - Timeout: 120s per call (set in `call_ollama()`)
 - Summarize prompt: ~200-400 tokens in → ~100 tokens out (5-field template)
 - Grade prompt: ~100 tokens in → **~500-2000 tokens out** (qwen3.5 ignores "return ONLY the letter" and outputs full reasoning chains)
-- Real-world performance: each file requires 2 LLM calls (summarize + grade). Budget ~90s per call at normal Ollama load, so total wall-clock ≈ `num_files × 180s`. Observed runs: 11 files in ~18 min (May 2026), 16 files in ~23 min (May 2026). Times vary with Ollama load; budget ~100s per LLM call for conservative planning.
+- Real-world performance: each file requires 2 LLM calls (summarize + grade). Budget ~90s per call at normal Ollama load, so total wall-clock ≈ `num_files × 180s`. Observed runs: 11 files in ~18 min (May 2026), 16 files in ~23 min (May 2026), 18 files (2 new + 16 re-summarized) with 0 kept in ~20-25 min (May 2026 — all graded C/D). Times vary with Ollama load; budget ~100s per LLM call for conservative planning.
 
 ### Pitfall: qwen3.5 Ignores Concise Grading Instructions
 
