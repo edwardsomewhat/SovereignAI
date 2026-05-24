@@ -54,6 +54,12 @@ ls ~/.hermes/training_data/curated/*.txt | wc -l     # growing = grade stage
 
 File-count monitoring is the **primary** way to track progress — even with `PYTHONUNBUFFERED=1`, small print() output from capture/summarize stages typically does not flush through the process pipe until process exit. Only the verbose LLM grading output (thousands of chars) overflows the OS pipe buffer and appears mid-run. Also check the state file for capture count: `cat ~/.hermes/training_data/pipeline_state.json`.
 
+**⚠️ Pitfall: `process(action="wait")` is clamped to 60s.** Regardless of the timeout value you pass (e.g., 600s), the wait action is internally clamped to 60 seconds. You cannot do a single long blocking wait — you must poll in a loop. Use file-count checks between wait calls to track progress:
+```bash
+# Check file counts frequently rather than doing one long wait
+echo "Raw: $(ls raw/*.md | wc -l) | Processed: $(ls processed/*.txt | wc -l) | Curated: $(ls curated/*.txt | wc -l)"
+```
+
 **⚠️ Pitfall: Stale capture output.** The capture-stage `print()` lines at the top of the process log may reflect a *previous* pipeline invocation, not the current one. Do NOT trust "Captured N new sessions" from the log. Always verify against the state file and raw/ directory file counts — if `pipeline_state.json` and `ls raw/*.md | wc -l` show no change, no new sessions were captured regardless of what the log says.
 
 ### Pitfall: Stdout Buffering Kills Pipeline Visibility
