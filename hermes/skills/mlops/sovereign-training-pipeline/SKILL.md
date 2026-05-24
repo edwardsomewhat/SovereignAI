@@ -52,16 +52,16 @@ ls ~/.hermes/training_data/processed/*.txt | wc -l   # growing = summarize stage
 ls ~/.hermes/training_data/curated/*.txt | wc -l     # growing = grade stage
 ```
 
-When output is buffered (missing PYTHONUNBUFFERED), the file-count monitoring pattern is the only way to track progress. Also check the state file for capture count: `cat ~/.hermes/training_data/pipeline_state.json`.
+File-count monitoring is the **primary** way to track progress — even with `PYTHONUNBUFFERED=1`, small print() output from capture/summarize stages typically does not flush through the process pipe until process exit. Only the verbose LLM grading output (thousands of chars) overflows the OS pipe buffer and appears mid-run. Also check the state file for capture count: `cat ~/.hermes/training_data/pipeline_state.json`.
 
 ### Pitfall: Stdout Buffering Kills Pipeline Visibility
 
-Without `PYTHONUNBUFFERED=1`, Python fully-buffers stdout in background mode. Result:
-- Capture and summarize `print()` output is **never flushed** — the agent sees nothing
-- Grade stage output partially flushes on exit, but may be truncated
-- The agent must infer results from directory file counts and state file
+Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summarize stage progress lines) typically does NOT flush through the Hermes process pipe in background mode — OS pipe buffering still applies. Result:
+- Capture and summarize `print()` output is usually invisible until process exit
+- Only the verbose LLM grading output (2000+ char reasoning chains) overflows the pipe buffer and appears mid-run
+- The agent must track progress via directory file counts and state file — do not rely on process log output
 
-Always use `PYTHONUNBUFFERED=1` when running in background.
+`PYTHONUNBUFFERED=1` is still important (without it, even the verbose grading output may not flush), but it does not guarantee visibility of small print() calls.
 
 ## Known Bug: Re-summarization Loop
 
@@ -87,13 +87,13 @@ See `references/re-summarization-bug.md` for full root-cause analysis and reprod
 - Timeout: 120s per call (set in `call_ollama()`)
 - Summarize prompt: ~200-400 tokens in → ~100 tokens out (5-field template)
 - Grade prompt: ~100 tokens in → **~500-2000 tokens out** (qwen3.5 ignores "return ONLY the letter" and outputs full reasoning chains)
-- Real-world performance: ~30-50s per summarize, ~20-40s per grade (qwen3.5 verbose output inflates grade times)
+- Real-world performance (observed May 2026, 11-file run): ~50-95s per summarize, ~60-120s per grade. Times vary with Ollama load; budget ~100s per LLM call for planning purposes.
 
 ### Pitfall: qwen3.5 Ignores Concise Grading Instructions
 
 The grading system prompt says "Output ONLY the letter grade (A, B, C, or D). No explanation." The qwen3.5:9b model **completely ignores this** and outputs 500-2000 tokens of reasoning before (or instead of) the grade letter. The pipeline still works because `call_ollama()` returns the full response and `stage_grade()` takes `.strip().upper()` — the letter is somewhere in the response, typically on the last line.
 
-This inflates grade stage time from ~1-3s to ~20-40s per file and wastes Ollama throughput.
+This inflates grade stage time from a theoretical ~1-3s to ~60-120s per file and wastes Ollama throughput.
 
 **Workaround** (not yet applied in the pipeline): Strip reasoning by extracting only the first non-empty line, or regex for `[ABCD]`, or set `num_predict: 5` to cap output. See `references/verbose-grading-output.md` for real output samples.
 
