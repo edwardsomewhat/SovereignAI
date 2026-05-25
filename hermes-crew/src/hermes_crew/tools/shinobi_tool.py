@@ -14,6 +14,8 @@ the coders agent calls this tool, which:
 import json
 import os
 import sys
+import time
+import uuid
 from pathlib import Path
 
 from crewai.tools import BaseTool
@@ -55,56 +57,70 @@ class ShinobiTool(BaseTool):
         """Execute the full Shinobi lifecycle."""
         target = target or os.getcwd()
 
+        # Phase 1: Package the task
         try:
+            from packager.spec import TaskSpec
+            from packager.models import ModelRegistry
             from packager.generator import generate_payload
-            from spawner.dispatcher import Dispatcher
-            from vanish.engine import run_engine
         except ImportError as e:
             return f"Shinobi import error: {e}. Is SHINOBI_HOME set? Current: {SHINOBI_HOME}"
 
-        # Phase 1: Package the task
         try:
-            payload_dir = generate_payload(
-                task=task,
+            spec = TaskSpec(
+                mission_id=f"shinobi-{uuid.uuid4().hex[:8]}",
+                goal=task,
                 target_dir=target,
-                coder_model=model or "gpt-oss:20b",
+                model_preferences={"coder": model} if model else {},
             )
+            registry = ModelRegistry()
+            output_dir = f"/tmp/shinobi-payload-{int(time.time())}"
+            payload_dir = generate_payload(spec, registry, output_dir)
         except Exception as e:
             return f"Packager failed: {e}"
 
-        # Phase 2: Deploy and execute
+        # Phase 2: Deploy, run, and vanish (all-in-one)
         try:
+            from spawner.dispatcher import Dispatcher
+
             dispatcher = Dispatcher(
                 payload_dir=str(payload_dir),
                 all_api=all_api,
             )
-            mission = dispatcher.run_and_vanish()
+            intel = dispatcher.run_and_vanish(
+                target_dir=target,
+                purge=True,
+            )
         except Exception as e:
             return f"Dispatcher failed: {e}"
 
-        # Phase 3: Process intel
-        try:
-            intel = run_engine(mission)
-        except Exception as e:
-            return f"Vanish engine failed: {e}"
-
         # Format result for CrewAI supervisor
-        status = "PASS" if mission.all_passed() else ("ERROR" if mission.has_errors() else "REJECT")
+        status = intel.get("status", "ERROR")
         subtasks = []
-        for pkt in mission.packets:
+        st_list = intel.get("subtasks") or []
+        for pkt in st_list:
             subtasks.append({
-                "agent": pkt.agent,
-                "model": pkt.model,
-                "status": pkt.status.value,
-                "output_preview": (pkt.output or "")[:200],
+                "agent": pkt.get("agent", "unknown"),
+                "model": pkt.get("model", "unknown"),
+                "status": pkt.get("status", "unknown"),
+                "output_preview": (pkt.get("output", "") or "")[:200],
             })
 
+        # Build summary from subtask results
+        passed = sum(1 for s in subtasks if s["status"] == "PASS")
+        failed = len(subtasks) - passed
+        summary = f"Shinobi mission: {passed}/{len(subtasks)} passed"
+        if failed:
+            summary += f", {failed} failed"
+        if intel.get("recovery", {}).get("attempts", 0) > 0:
+            summary += f" (recovery: {intel['recovery']['attempts']} attempts)"
+
         result = {
-            "mission_id": mission.mission_id,
+            "mission_id": intel.get("mission_id", "unknown"),
             "status": status,
             "subtasks": subtasks,
-            "recovery": mission.recovery,
-            "summary": mission.summary(),
+            "recovery": intel.get("recovery", {}),
+            "summary": summary,
+            "intel_saved_to": intel.get("intel_saved_to", ""),
         }
 
         return json.dumps(result, indent=2)
