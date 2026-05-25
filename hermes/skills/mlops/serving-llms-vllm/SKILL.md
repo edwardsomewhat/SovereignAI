@@ -53,6 +53,17 @@ vLLM's CPU offloading operates at weight-load time. The engine loads offloaded w
 - Not all quantization formats work with CPU offload — AWQ and GPTQ are tested; AutoRound and compressed-tensors may work but verify
 - First inference after boot is slow as weights page in; subsequent requests are faster
 
+## KV Cache Compatibility
+
+**Critical**: `--kv-cache-dtype fp8_e5m2` is incompatible with compressed-tensors / FP8 checkpoints. vLLM will abort with:
+```
+ValueError: fp8_e5m2 kv-cache is not supported with fp8 checkpoints.
+```
+
+**Fix**: Use `--kv-cache-dtype auto` and let vLLM select the best compatible format. This is especially important for AWQ/compressed-tensors models (Nemotron-3, GPT-OSS, any `quantization=compressed-tensors` model).
+
+The `auto` setting also avoids the silent tool-call cascade that can occur with TurboQuant KV caches under MTP speculative decoding.
+
 ## Genesis Patches (Sandermage) for Qwen Models
 
 Genesis v7.14+ patches fix critical upstream vLLM bugs for Qwen3.5/3.6 models. The patch package mounts as a Python module into vLLM's site-packages.
@@ -134,12 +145,13 @@ Production safe: 48K + 0.92 mem_util. Full variant matrix, cliff details, model 
 
 ### GPT-OSS 20B (OpenAI)
 
-21B total / 3.6B active MoE (24 experts). Native MXFP4 (~16 GB VRAM). 128K native context. Apache 2.0. Tagged `vllm` on HF, 8M+ downloads.
+21B total / 3.6B active MoE (24 experts). Native MXFP4 (~13 GB VRAM for shards, though HF downloads 39 GB with dupes). 128K native context. Apache 2.0. Tagged `vllm` on HF, 8M+ downloads.
 
-**Harmony format is handled natively by vLLM** — no adapter needed. vLLM's `harmony_utils.py` (imports `openai-harmony` Rust library) translates between standard OpenAI API format and Harmony's TypeScript-style tool definitions internally. Standard OpenAI clients work. Tool calling, reasoning (CoT channels), and structured output are all native.
+**Harmony format is handled natively by vLLM** — no adapter needed. vLLM's `harmony_utils.py` (imports `openai-harmony` Rust library) translates between standard OpenAI API format and Harmony's TypeScript-style tool definitions internally. Standard OpenAI clients work. The `reasoning` field in responses contains the analysis channel (CoT), and `content` contains the final channel — auto-separated.
 
-Compose pattern: `--dtype auto`, no `--quantization` flag (MXFP4 auto-detected), no `--tool-call-parser` (harmony handles it). Use `--trust-remote-code` (custom `GptOssForCausalLM` architecture). `--enforce-eager` recommended for MoE.
+**Tool calling limitation**: Without `--enable-auto-tool-choice`, tools are rejected (HTTP 400). With it, a `--tool-call-parser` is required — but no standard parser works with Harmony's TypeScript-style tool format. **Partial fix**: a no-op parser plugin (`harmony_noop`) satisfies validation. However, the model still doesn't reliably emit tool calls through the vLLM pipeline because Harmony routes tools through channel output (`<|channel|>commentary`) rather than standard `<tool_call>` blocks. **Use GPT-OSS for reasoning/chat workloads; prefer Nemotron or Qwen for agentic tool-calling.** Reference plugin at `templates/harmony_noop_tool_parser.py`.
 
+Compose pattern:
 ```yaml
 command:
   - --model
@@ -149,24 +161,28 @@ command:
   - --dtype
   - auto
   - --max-model-len
-  - "131072"
+  - "131072"        # fits at 13 GB weights + 128K ctx
+  - --kv-cache-dtype
+  - auto            # fp8_e5m2 incompatible with MXFP4 checkpoints
   - --trust-remote-code
   - --enforce-eager
-  - --enable-auto-tool-choice
   # No --tool-call-parser, no --reasoning-parser — harmony handles both
+  # No --enable-auto-tool-choice — would require a parser (none compatible)
 ```
+
+**Performance**: ~80 tok/s decode on RTX 3090 (measured). Faster than Nemotron (~52 tok/s) due to smaller active params (3.6B vs 3B) and efficient MXFP4 kernels.
 
 ### Nemotron-3 Nano 30B-A3B
 
-30B total / 3B active MoE (NemotronH architecture, `nemotron_h` in vLLM registry). AWQ INT4 quant at `stelterlab/NVIDIA-Nemotron-3-Nano-30B-A3B-AWQ` (~8 GB VRAM). 128K native context. NVIDIA Open Model License.
+30B total / 3B active MoE (NemotronH architecture, `nemotron_h` in vLLM registry). AWQ INT4 quant at `stelterlab/NVIDIA-Nemotron-3-Nano-30B-A3B-AWQ` (**~17 GB** actual — 4 shards: 3×4.7GB + 2.7GB, NOT the ~8 GB many assume). On a 24 GB 3090, this leaves only ~5-6 GB for KV cache, capping realistic context at ~65K (at 0.95 util with auto KV dtype). 128K native context.
 
-**Tool parser**: Hermes-style XML format — `--tool-call-parser hermes`. Chat template uses `<|im_start|>/<|im_end|>` format with `<tool_call><function=name><parameter=key>value</parameter></function></tool_call>`.
+**Tool parser**: XML format — `<tool_call><function=name><parameter=key>value</parameter></function></tool_call>`. vLLM's built-in `hermes` parser expects JSON inside the tags and silently fails on this XML. Use the custom `nemotron_xml` parser plugin instead (see "Custom Tool Parser Plugins" below). Chat template uses `<|im_start|>/<|im_end|>` format. Working round-trip verified: tool call → result → final answer.
 
 **Ollama naming**: Ollama's `nemotron3:33b` = `nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4` (the multimodal Omni variant, not the text-only Nano). The "33b" tag is Ollama's compressed-size convention, not parameter count.
 
 **NVFP4 / modelopt**: The Omni NVFP4 variant uses `quant_method: modelopt` (vLLM supports `modelopt_fp4`). Model type `NemotronH_Nano_Omni_Reasoning_V3` maps to `nano_nemotron_vl.py` in vLLM's registry. For text-only agent use, add `--language-model-only`.
 
-Compose pattern for AWQ:
+Compose pattern for AWQ (tested and working on RTX 3090 24 GB):
 ```yaml
 command:
   - --model
@@ -175,14 +191,29 @@ command:
   - nemotron-3-nano
   - --dtype
   - float16
+  # 65K context — safe for 17 GB weights (5.1 GB KV remaining).
+  # 128K will OOM. Try 81920 or 98304 if adventurous.
   - --max-model-len
-  - "131072"
+  - "65536"
+  - --gpu-memory-utilization
+  - "0.95"
+  - --kv-cache-dtype
+  - auto           # fp8_e5m2 incompatible with compressed-tensors
   - --trust-remote-code
   - --enforce-eager
   - --enable-auto-tool-choice
   - --tool-call-parser
-  - hermes
+  - nemotron_xml
+  - --tool-parser-plugin
+  - /patches/nemotron_xml_tool_parser.py
+  # No --reasoning-parser — Nemotron template handles <think> natively
 ```
+
+**Key config decisions**:
+- `--kv-cache-dtype auto` (NOT `fp8_e5m2`) — compressed-tensors fp8 checkpoint incompatibility
+- `--gpu-memory-utilization 0.95` — needs the headroom; 5.1 GB KV at 65K
+- `--max-model-len 65536` — realistic ceiling on 24 GB with 17 GB weights
+- No reasoning parser — template's `<think>...</think>` handled by Jinja template natively
 
 ## Model Download Pattern
 
@@ -203,16 +234,82 @@ HF_HUB_ENABLE_HF_TRANSFER=1 hf download stelterlab/NVIDIA-Nemotron-3-Nano-30B-A3
 
 ## Tool Parser Selection
 
-vLLM needs a tool-call-parser to parse the model's tool call output back into structured JSON. Match the parser to the model's chat template format:
+vLLM needs a tool-call-parser to parse the model's tool call output back into structured JSON. Match the parser to the model's chat template format.
+
+**Critical rule**: `--enable-auto-tool-choice` **requires** `--tool-call-parser` to be set — vLLM v0.19+ enforces this at validation. Without both, the server rejects any request containing a `tools` array with HTTP 400. You MUST provide both flags together or neither.
 
 | Model family | Tool format in template | `--tool-call-parser` | Notes |
 |---|---|---|---|
 | Qwen3.5/3.6 | XML: `<tool_call>...` | `qwen3_coder` | Genesis P64/P68/P69 fix edge cases |
-| Nemotron-3 (NemotronH) | XML: `<tool_call><function=name><parameter=key>` | `hermes` | Matches Hermes XML format |
-| GPT-OSS 20B | Harmony: `functions.<name>` namespace | *none needed* | vLLM's harmony_utils.py handles parsing |
+| Nemotron-3 (NemotronH) | XML: `<tool_call><function=name><parameter=key>` | `nemotron_xml` (plugin) | Built-in `hermes` parser expects JSON, fails on Nemotron XML. Use `nemotron_xml_tool_parser.py` plugin — registered via `ToolParserManager.register_module("nemotron_xml")`, loaded with `--tool-parser-plugin`. |
+| GPT-OSS 20B | Harmony: `functions.<name>` namespace | *none works* | vLLM's harmony_utils.py handles format translation, but tool parsing through standard `--tool-call-parser` is not supported. Without `--enable-auto-tool-choice`, tools are rejected. With it, a parser is required but none match. **Workaround**: use for reasoning/chat; prefer Nemotron or Qwen for agentic tool-calling. |
 | Llama 3.x | JSON function call | `pythonic` or `json` | Standard OpenAI format |
 
-**Reasoning parsers**: Qwen3 uses `--reasoning-parser qwen3` for `<think>...</think>` tags. GPT-OSS Harmony uses its own channel-based reasoning (`<|channel|>analysis`) handled by the harmony parser. Nemotron-3 uses `<think>...</think>` in its chat template Jinja — may work with `qwen3` reasoning parser or template-only handling.
+**Reasoning parsers**: Qwen3 uses `--reasoning-parser qwen3` for `<think>...</think>` tags. GPT-OSS Harmony uses its own channel-based reasoning (`<|channel|>analysis`) handled by the harmony parser — no explicit reasoning-parser needed. Nemotron-3 uses `<think>...</think>` in its chat template Jinja — template handles it natively; adding `--reasoning-parser deepseek_r1` strips think blocks but may interfere with tool call parsing.
+
+## Custom Tool Parser Plugins
+
+vLLM supports loading custom tool parsers via `--tool-parser-plugin <path>`. The plugin file must register itself using the `ToolParserManager.register_module("name")` decorator. The registered name becomes the value for `--tool-call-parser`.
+
+### Plugin structure
+
+```python
+from vllm.tool_parsers import ToolParserManager
+from vllm.tool_parsers.abstract_tool_parser import ToolParser
+
+@ToolParserManager.register_module("my_parser_name")
+class MyCustomParser(ToolParser):
+    supports_required_and_named: bool = True  # or False for non-JSON formats
+
+    def extract_tool_calls(self, model_output, request, token_ids=None):
+        # Parse model_output string, return ExtractedToolCallInformation
+        ...
+
+    def extract_tool_calls_streaming(self, previous_text, current_text,
+                                      delta_text, request, token_ids=None):
+        # Return DeltaMessage with tool call deltas
+        ...
+```
+
+### Key implementation notes
+
+- **`token_ids` kwarg**: vLLM v0.19+ passes `token_ids: Sequence[int] | None = None` to both `extract_tool_calls` and `extract_tool_calls_streaming`. Always include it in your method signatures even if unused — otherwise you get `TypeError: got an unexpected keyword argument 'token_ids'`.
+- **`supports_required_and_named`**: Set `False` for non-JSON formats (XML, custom templates). When `False`, vLLM falls back to your `extract_tool_calls` for required/named tool choice instead of using its built-in JSON parser.
+- **Registration**: The `@ToolParserManager.register_module("name")` decorator registers your class. The name used in the decorator is what you pass to `--tool-call-parser`.
+- **Mounting**: Mount the plugin file into the Docker container and pass both `--tool-call-parser <name>` and `--tool-parser-plugin <path>`.
+
+### Docker Compose plugin mount
+
+```yaml
+volumes:
+  - ../patches/my_parser.py:/patches/my_parser.py:ro
+
+command:
+  - --enable-auto-tool-choice
+  - --tool-call-parser
+  - my_parser_name
+  - --tool-parser-plugin
+  - /patches/my_parser.py
+```
+
+### Nemotron XML parser example
+
+Nemotron-3 outputs XML tool calls that vLLM's built-in `hermes` parser can't handle (it expects JSON). The fix is a custom parser registered as `nemotron_xml`:
+
+```python
+@ToolParserManager.register_module("nemotron_xml")
+class NemotronXMLToolParser(ToolParser):
+    supports_required_and_named = False
+    tool_call_start_token = "<tool_call>"
+    tool_call_end_token = "</tool_call>"
+
+    def extract_tool_calls(self, model_output, request, token_ids=None):
+        # Parse <tool_call><function=name><parameter=key>val</parameter></function></tool_call>
+        # into ToolCall objects with json.dumps(arguments)
+        ...
+```
+
+Full reference implementation at `templates/nemotron_xml_tool_parser.py` and `templates/harmony_noop_tool_parser.py`.
 
 ## Model Type Registry Check
 

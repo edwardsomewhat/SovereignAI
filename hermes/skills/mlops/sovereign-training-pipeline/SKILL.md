@@ -60,6 +60,8 @@ File-count monitoring is the **primary** way to track progress — even with `PY
 echo "Raw: $(ls raw/*.md | wc -l) | Processed: $(ls processed/*.txt | wc -l) | Curated: $(ls curated/*.txt | wc -l)"
 ```
 
+**⚠️ Pitfall: Orphaned processed files inflate graded counts.** If a previous pipeline run was interrupted during the grade stage (timeout, kill, crash), processed files remain in `processed/` and don't get cleaned up. The next full run will grade them alongside newly-summarized files, making the graded count appear much higher than the summarized count (e.g., 13 summarized but 29 graded — 16 orphaned from a prior interrupted run). This is harmless but misleading when reading the output. The orphaned files are genuinely graded (kept or deleted) on the subsequent run.
+
 **⚠️ Pitfall: Stale capture output.** The capture-stage `print()` lines at the top of the process log may reflect a *previous* pipeline invocation, not the current one. Do NOT trust "Captured N new sessions" from the log. Always verify against the state file and raw/ directory file counts — if `pipeline_state.json` and `ls raw/*.md | wc -l` show no change, no new sessions were captured regardless of what the log says.
 
 ### Pitfall: Stdout Buffering Kills Pipeline Visibility
@@ -76,14 +78,15 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 `stage_summarize()` checks `processed/{stem}.txt` to skip already-summarized sessions. But `stage_grade()` **deletes** processed files after grading (A/B → moves to curated; C/D → deleted). On the next run, summarize re-processes ALL raw files — including the 90%+ that were already graded A/B. This wastes ~100+ LLM calls per run.
 
 **Observed behavior (cumulative):**
-| Date | Raw | Summarized+graded | Re-summarization rate | Kept |
-|------|-----|-------------------|-----------------------|------|
-| 24 May 2026 | 129 | 18 | ~14% | 0 |
-| 25 May 2026 (early) | 133 | 20 | ~15% | 0 |
-| 25 May 2026 (cron) | 135 | 22 | ~16% | 1 |
-| 25 May 2026 (cron #2) | 138 | 23 | ~17% | 1 |
+| Date | Raw | Summarized | Graded | Kept | Deleted |
+|------|-----|-----------|--------|------|---------|
+| 24 May 2026 | 129 | 18 | 18 | 0 | 18 |
+| 25 May 2026 (early) | 133 | 20 | 20 | 0 | 20 |
+| 25 May 2026 (cron) | 135 | 22 | 22 | 1 | 21 |
+| 25 May 2026 (cron #2) | 138 | 23 | 23 | 1 | 22 |
+| 25 May 2026 (cron #3) | 145 | 13 | 29 | 1 | 28 |
 
-The ~15% re-summarization rate is holding across runs. The "0 kept" streak is not a rule — keepers are possible but rare given the C/D-heavy grading rubric. The full re-summarization behavior described above should be considered the worst case; observed behavior may be less severe.
+The ~15% re-summarization rate from the pre-fix era is now gone — the curated-path skip (applied in the code) prevents re-processing already-kept sessions. However, *orphaned processed files* from interrupted runs accumulate in `processed/` and get graded on the next complete run, causing the graded count to exceed the summarized count (e.g., 13 summarized but 29 graded — 16 orphaned from a prior interrupted run). The "0 kept" streak is not a rule — keepers are possible but rare given the C/D-heavy grading rubric.
 
 ### Fix
 In `stage_summarize()`, add a curated-path skip before the LLM call:
