@@ -81,6 +81,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 24 May 2026 | 129 | 18 | ~14% | 0 |
 | 25 May 2026 (early) | 133 | 20 | ~15% | 0 |
 | 25 May 2026 (cron) | 135 | 22 | ~16% | 1 |
+| 25 May 2026 (cron #2) | 138 | 23 | ~17% | 1 |
 
 The ~15% re-summarization rate is holding across runs. The "0 kept" streak is not a rule — keepers are possible but rare given the C/D-heavy grading rubric. The full re-summarization behavior described above should be considered the worst case; observed behavior may be less severe.
 
