@@ -18,7 +18,11 @@ from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from dotenv import load_dotenv
 
-from hermes_crew.tools import AntigravityTool, OllamaCodeTool, ShinobiTool
+from hermes_crew.tools import (
+    AntigravityTool, OllamaCodeTool, ShinobiTool,
+    run_node_command, health_check_all,
+    list_environments, list_containers, manage_container, deploy_stack,
+)
 
 # Load env from project root
 load_dotenv()
@@ -107,11 +111,20 @@ class HermesCrew:
 
     @agent
     def infra(self) -> Agent:
+        """Infrastructure operator — SSH into nodes, manage Docker, run health checks."""
         return Agent(
             config=self.agents_config["infra"],
             llm=_get_llm(),
             verbose=True,
             allow_delegation=False,
+            tools=[
+                run_node_command,
+                health_check_all,
+                list_environments,
+                list_containers,
+                manage_container,
+                deploy_stack,
+            ],
         )
 
     @agent
