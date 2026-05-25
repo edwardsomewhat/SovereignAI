@@ -75,7 +75,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 
 `stage_summarize()` checks `processed/{stem}.txt` to skip already-summarized sessions. But `stage_grade()` **deletes** processed files after grading (A/B → moves to curated; C/D → deleted). On the next run, summarize re-processes ALL raw files — including the 90%+ that were already graded A/B. This wastes ~100+ LLM calls per run.
 
-**Observed behavior note (24 May 2026):** In a run with 129 raw files and 0 processed, only 18 files were actually summarized+graded — not all 129. The pipeline's final output reported "Graded: 0 kept, 18 deleted." This may indicate the bug has been partially mitigated (e.g., a hidden check or limit), or it depends on specific conditions. The full re-summarization behavior described above should be considered the worst case; observed behavior may be less severe.
+**Observed behavior note (24 May 2026):** In a run with 129 raw files and 0 processed, only 18 files were actually summarized+graded — not all 129. **Observed (25 May 2026):** 133 raw files, 20 summarized+graded (~15% re-summarization rate, consistent). Both runs had 0 kept (all C/D). The pipeline's final output always reports the actual count graded. This may indicate the bug has been partially mitigated (e.g., a hidden check or limit), or it depends on specific conditions. The full re-summarization behavior described above should be considered the worst case; observed behavior may be less severe.
 
 ### Fix
 In `stage_summarize()`, add a curated-path skip before the LLM call:
