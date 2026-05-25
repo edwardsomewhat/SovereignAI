@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hermes-crew"
+version = "0.1.0"
+description = "Hierarchical multi-agent crew for the SovereignAI distributed compute network"
+requires-python = ">=3.11"
+dependencies = [
+    "crewai>=1.14.0",
+    "crewai-tools>=1.14.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+hermes-crew = "hermes_crew.main:run"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hermes_crew"]

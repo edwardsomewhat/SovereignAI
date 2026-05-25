@@ -1,0 +1,26 @@
+[Unit]
+Description=llama.cpp MTP Inference Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/tmp/llama-b9247/llama-server \
+    -m %h/llama.cpp-models/Qwen3.5-9B-UD-Q4_K_XL.gguf \
+    -ngl 99 -c 8192 -fa on -np 1 \
+    --spec-type draft-mtp --spec-draft-n-max 6 \
+    --host 0.0.0.0 --port 8080
+
+# Environment for HuggingFace cache
+Environment=LLAMA_CACHE=%h/llama.cpp-models
+Environment=HF_HOME=%h/.cache/huggingface
+
+# Restart policy
+Restart=on-failure
+RestartSec=5
+
+# Resource limits
+LimitNOFILE=65536
+
+[Install]
+WantedBy=default.target

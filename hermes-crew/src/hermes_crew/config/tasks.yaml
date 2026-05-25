@@ -1,0 +1,130 @@
+# Hermes Crew - Task Definitions
+# Tasks are assigned by the hierarchical Supervisor at runtime.
+# These define the scope and expected outputs for each role.
+
+infrastructure_audit:
+  description: >
+    Perform a health audit of all 8 Tailscale-connected nodes. Check: uptime,
+    disk space, Docker container status, GPU availability, Tailscale connectivity,
+    and any systemd service failures. Report any anomalies with severity levels.
+  expected_output: >
+    A structured audit report with per-node status (online/offline, disk%, GPU status,
+    key services running), plus a prioritized list of issues ranked by severity
+    (critical/warning/info).
+  agent: infra
+
+n8n_workflow_deploy:
+  description: >
+    Design and deploy an N8N workflow on Charlotte (100.70.223.108) for: {workflow_spec}.
+    The workflow must include error handling, retry logic, and webhook triggers
+    where appropriate.
+  expected_output: >
+    JSON workflow definition ready for N8N import, plus a deployment summary
+    confirming successful activation and describing trigger/action flow.
+  agent: n8n_manager
+
+web_service_deploy:
+  description: >
+    Build and deploy a web service for: {service_spec}.
+    Target node: csweb (100.71.6.98). Coordinate with DB Manager for persistence
+    and Cloudflare for DNS/routing configuration.
+  expected_output: >
+    Service deployed and verified at its endpoint. Include: source repo/branch,
+    deployment URL, health check result, and any DB migrations applied.
+  agent: web_dev
+
+database_migration:
+  description: >
+    Plan and execute a database schema migration for: {migration_spec}.
+    Must include: backup verification, migration script, rollback plan,
+    and post-migration validation query.
+  expected_output: >
+    Migration report with: backup hash verified, SQL executed, row counts before/after,
+    and rollback script (if applicable). Confirmation that all dependent services
+    still function.
+  agent: db_manager
+
+dns_configure:
+  description: >
+    Configure Cloudflare DNS and/or Tunnel for: {domain_spec}.
+    Ensure SSL/TLS is enforced, origin health checks pass, and DNS propagation
+    is verified.
+  expected_output: >
+    DNS record summary (type, name, value, TTL, proxy status), tunnel status
+    (if applicable), SSL mode, and propagation check result.
+  agent: cloudflare
+
+code_implementation:
+  description: >
+    Implement the following feature or fix using the best tool for the job:
+    {code_spec}.
+    Use agy_code for quick/simple tasks, ollama_code for complex/sovereign
+    work. Never write code directly — always delegate.
+  expected_output: >
+    ollama_code execution summary: what files were changed, test results,
+    and any issues encountered. Include the raw model output.
+  agent: coders
+
+vision_analysis:
+  description: >
+    Process the following image(s) using the sovereign-vision container on Nano
+    (Coral TPU + Florence2): {vision_spec}.
+    If the vision container is down, coordinate with Infra to restore it first.
+  expected_output: >
+    Analysis results (captions, detected objects, text extracted, or whatever
+    the spec requires), plus container health confirmation and processing latency.
+  agent: vision
+
+creative_generation:
+  description: >
+    Generate creative media via ComfyUI on conchai (primary, RTX 3060) or
+    hq-ai (fallback, P5000) for: {creative_spec}.
+    This may involve images, video, or audio depending on the request.
+  expected_output: >
+    Generated media file paths or URLs, workflow used, generation parameters,
+    and processing time. For images: include prompt, seed, model, and dimensions.
+  agent: creative
+
+quality_gate:
+  description: >
+    Perform a critical quality assessment of: {qa_spec}.
+    Evaluate: correctness (does it solve the problem?), completeness
+    (are edge cases handled?), security (any vulnerabilities?),
+    and production readiness (is it deployable?).
+    Do NOT re-run tests the coder already ran — focus on judgment.
+  expected_output: >
+    Verdict (PASS/FLAG/REJECT) with specific, actionable feedback.
+    For FLAG: what needs to change. For REJECT: why it can't ship.
+    Include the reasoning behind each finding.
+  agent: qa
+
+payment_integration:
+  description: >
+    Implement or update payment processing for: {payment_spec}.
+    Must handle: security (PCI considerations), error states, webhook verification,
+    and idempotency.
+  expected_output: >
+    Integration summary with: provider, endpoints configured, webhook secret
+    verified, test transaction succeeded (if applicable), and any configuration
+    variables set.
+  agent: payments
+
+code_review:
+  description: >
+    Review the following code changes by delegating to the ollama_code
+    tool: {review_spec}.
+    Use ollama_code with a clear review prompt.
+  expected_output: >
+    ollama_code review output with: summary assessment, specific issues found,
+    and suggestions for improvement.
+  agent: coders
+
+network_health_check:
+  description: >
+    Check Tailscale connectivity between all nodes. Run ping tests, verify
+    SSH access is functional on all nodes, and confirm key services are
+    reachable (Ollama, ComfyUI, N8N, Dockhand).
+  expected_output: >
+    Connectivity matrix showing all node pairs, latency measurements,
+    and service endpoint status for each node.
+  agent: infra
