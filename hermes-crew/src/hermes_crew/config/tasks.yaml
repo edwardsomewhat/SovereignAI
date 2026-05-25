@@ -56,13 +56,15 @@ dns_configure:
 
 code_implementation:
   description: >
-    Implement the following feature or fix using the best tool for the job:
+    Implement the following feature or fix using the Shinobi protocol:
     {code_spec}.
-    Use agy_code for quick/simple tasks, ollama_code for complex/sovereign
-    work. Never write code directly — always delegate.
+    PRIMARY: shinobi_code — full swarm (scout→coder→builder→reviewer→QA→vanish).
+    Use agy_code for quick single-file fixes or ollama_code for simple local tasks.
+    Never write code directly — always delegate.
   expected_output: >
-    ollama_code execution summary: what files were changed, test results,
-    and any issues encountered. Include the raw model output.
+    Shinobi mission result: mission_id, subtask status for each phase (scout/coder/
+    builder/reviewer/QA), overall PASS/FAIL/ERROR, recovery attempts if any, and
+    intel archive path. Include summary of files changed and test results.
   agent: coders
 
 vision_analysis:
@@ -111,12 +113,13 @@ payment_integration:
 
 code_review:
   description: >
-    Review the following code changes by delegating to the ollama_code
-    tool: {review_spec}.
-    Use ollama_code with a clear review prompt.
+    Review the following code changes by deploying a Shinobi swarm:
+    {review_spec}.
+    PRIMARY: shinobi_code — scout maps the changes, reviewer evaluates,
+    QA provides final verdict. Falls back to ollama_code for quick reviews.
   expected_output: >
-    ollama_code review output with: summary assessment, specific issues found,
-    and suggestions for improvement.
+    Shinobi review packet: reviewer assessment, specific issues found,
+    QA verdict (PASS/FLAG/REJECT), and suggestions for improvement.
   agent: coders
 
 network_health_check:
