@@ -85,6 +85,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 25 May 2026 (cron) | 135 | 22 | 22 | 1 | 21 |
 | 25 May 2026 (cron #2) | 138 | 23 | 23 | 1 | 22 |
 | 25 May 2026 (cron #3) | 145 | 13 | 29 | 1 | 28 |
+| 26 May 2026 (cron) | 152 | 14 | 31 | 2 | 29 |
 
 The ~15% re-summarization rate from the pre-fix era is now gone — the curated-path skip (applied in the code) prevents re-processing already-kept sessions. However, *orphaned processed files* from interrupted runs accumulate in `processed/` and get graded on the next complete run, causing the graded count to exceed the summarized count (e.g., 13 summarized but 29 graded — 16 orphaned from a prior interrupted run). The "0 kept" streak is not a rule — keepers are possible but rare given the C/D-heavy grading rubric.
 
