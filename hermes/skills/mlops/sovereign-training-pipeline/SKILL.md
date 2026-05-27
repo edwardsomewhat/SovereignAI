@@ -88,10 +88,11 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 26 May 2026 (cron) | 152 | 14 | 31 | 2 | 29 |
 | 26 May 2026 (cron #2) | 154 | 31 | 31 | 1 | 30 |
 | 27 May 2026 (cron) | 158 | 18 | 34 | 0 | 34 |
+| 27 May 2026 (cron #2) | 160 | 36 | 36 | 0 | 36 |
 
-The ~15% re-summarization rate from the pre-fix era is now gone — the curated-path skip (applied in the code) prevents re-processing already-kept sessions. However, *orphaned processed files* from interrupted runs accumulate in `processed/` and get graded on the next complete run, causing the graded count to exceed the summarized count (e.g., 13 summarized but 29 graded — 16 orphaned from a prior interrupted run). When no orphaned files exist (e.g., 26 May cron #2), summarized == graded — a clean run. The 0-kept streak is not a rule — keepers are possible but rare given the C/D-heavy grading rubric.
+The ~15% re-summarization rate from the pre-fix era is now gone — the curated-path skip (applied in the code) prevents re-processing already-kept sessions. *Orphaned processed files* from interrupted runs can still cause graded > summarized, but this run was clean (36 == 36).
 
-**⚠️ 27 May: 34 graded, 0 kept.** This is the first all-delete run (previous runs had 1-2 keepers). Likely cause: the qwen3.5 thinking model may have been upgraded to a newer variant that puts even more chain-of-thought into the response field, drowning the actual grade letter. If this persists across multiple runs, consider switching to a non-thinking model for grading (see `references/verbose-grading-output.md` fix option 4).
+**⚠️ 27 May: Two consecutive 0-keeper runs (34 graded → 0 kept, then 36 graded → 0 kept).** This is no longer a one-off. The qwen3.5 thinking model is clearly drowning the grade letter in chain-of-thought, and `stage_grade()`'s `.strip().upper()` on the full response isn't reliably extracting it. Two full runs with zero keepers despite 70 graded files is a strong signal to try a non-thinking model or add `num_predict: 5` to cap output (see `references/verbose-grading-output.md` fix option 4).
 
 ### Fix
 In `stage_summarize()`, add a curated-path skip before the LLM call:
