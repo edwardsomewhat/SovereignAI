@@ -33,17 +33,17 @@ cd /home/fated
 ./.hermes/hermes-agent/venv/bin/python training_pipeline.py all
 ```
 
-**⚠️ Always run in background mode.** The pipeline makes one LLM call per session (Ollama at `http://100.84.92.74:11434`, model `qwen3.5:9b`). With 100+ sessions, foreground mode will time out at 600s. Use:
+**⚠️ Always run in background mode.** The pipeline makes one LLM call per session (Ollama at `http://hq-ai:11434`, model `qwen3.5:9b`). The default `http://100.84.92.74:11434` is unreachable from this node — always override with `TRAINING_LLM_URL=http://hq-ai:11434`. With 100+ sessions, foreground mode will time out at 600s. Use:
 
 ```bash
-PYTHONUNBUFFERED=1 ./.hermes/hermes-agent/venv/bin/python training_pipeline.py all
+TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 ./.hermes/hermes-agent/venv/bin/python training_pipeline.py all
 ```
 
-The `PYTHONUNBUFFERED=1` is **critical** — without it, Python buffers stdout when not connected to a TTY, and the capture/summarize stage output is lost. Only the grade stage output flushes on exit. See pitfall below.
+The `PYTHONUNBUFFERED=1` is **critical** — without it, Python buffers stdout when not connected to a TTY, and the capture/summarize stage output is lost. Only the grade stage output flushes on exit. The `TRAINING_LLM_URL=http://hq-ai:11434` is also critical — the hardcoded default IP `100.84.92.74:11434` is unreachable from this node. See pitfall below.
 
 Hermes invocation:
 ```bash
-terminal(command="PYTHONUNBUFFERED=1 .../venv/bin/python training_pipeline.py all", background=true, notify_on_complete=true, timeout=1800)
+terminal(command="TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 .../venv/bin/python training_pipeline.py all", background=true, notify_on_complete=true, timeout=1800)
 ```
 
 Then poll with `process(action="poll", session_id="...")` or watch file counts:
