@@ -150,6 +150,24 @@ wavs, sr = model.generate_custom_voice(
 - The tokenizer model is lightweight and auto-downloaded
 - First run downloads models from HuggingFace (~1.2-3.4 GB). Subsequent runs use cache.
 
+### Loading multiple models sequentially (critical pitfall)
+
+When running VoiceDesign → Clone pipeline or switching between models, you **must** explicitly free the first model before loading the second. Python's GC and PyTorch's caching won't do it fast enough, causing `torch.OutOfMemoryError` even when nvidia-smi shows free VRAM:
+
+```python
+import gc
+
+# After using model A, before loading model B:
+del model_a
+gc.collect()
+torch.cuda.empty_cache()
+
+# Now safe to load model B
+model_b = Qwen3TTSModel.from_pretrained(...)
+```
+
+Without this, loading two 1.7B models back-to-back on a 24 GB card with other services will OOM every time. The `empty_cache()` call releases PyTorch's reserved-but-unallocated memory pool.
+
 ## Audio I/O Integration
 
 See `references/alsa-audio-setup.md` for full ALSA configuration, device discovery, and common pitfalls (muted Master, Auto-Mute, front vs rear jacks).

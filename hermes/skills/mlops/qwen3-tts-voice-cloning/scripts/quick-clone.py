@@ -1,51 +1,60 @@
 #!/usr/bin/env python3
-"""Quick voice clone: record reference audio from Obsbot mic, clone, playback."""
-import subprocess, sys
-from pathlib import Path
+"""End-to-end: record from mic → clone with Qwen3-TTS 1.7B → playback.
 
-MIC_DEVICE = "hw:0,0"      # Obsbot Tiny mic
-SPEAKER_DEVICE = "hw:3,1"   # Front headphone jack
-REF_DURATION = 10           # seconds to record
-MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"  # or 0.6B-Base for lighter
+Usage:
+    source ~/venvs/qwen3-tts/bin/activate
+    python quick-clone.py "Text to speak in cloned voice."
+"""
 
-def record(path, duration=REF_DURATION):
-    print(f"Recording {duration}s from {MIC_DEVICE}...")
+import subprocess, sys, os, gc
+import torch, soundfile as sf
+from qwen_tts import Qwen3TTSModel
+
+REF_FILE = "/tmp/quick_clone_ref.wav"
+OUT_FILE = "/tmp/quick_clone_out.wav"
+MIC = "hw:0,0"
+SPEAKER = "hw:3,0"
+DURATION = 5  # seconds to record
+
+
+def record():
+    print(f"Recording {DURATION}s from {MIC}... speak now!")
     subprocess.run([
         "ffmpeg", "-y", "-f", "alsa", "-ac", "1", "-ar", "48000",
-        "-i", MIC_DEVICE, "-t", str(duration), path
-    ], check=True)
-    print(f"Saved: {path}")
+        "-i", MIC, "-t", str(DURATION), REF_FILE,
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+    size = os.path.getsize(REF_FILE)
+    print(f"Captured: {size/1024:.0f} KB")
 
-def clone(ref_audio, ref_text, output, text):
-    import torch, soundfile as sf
-    from qwen_tts import Qwen3TTSModel
 
-    print(f"Loading model: {MODEL}")
+def clone(text):
+    print(f"Loading 1.7B Base model...")
     model = Qwen3TTSModel.from_pretrained(
-        MODEL, device_map="cuda:0", dtype=torch.bfloat16)
-
-    print(f"Cloning voice: '{text}'")
+        "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        device_map="cuda:0", dtype=torch.bfloat16,
+    )
+    print(f"Cloning: \"{text}\"")
     wavs, sr = model.generate_voice_clone(
         text=text, language="English",
-        ref_audio=ref_audio, ref_text=ref_text,
+        ref_audio=REF_FILE, x_vector_only_mode=True,
     )
-    sf.write(output, wavs[0], sr)
-    print(f"Saved: {output}")
-    return sr
+    sf.write(OUT_FILE, wavs[0], sr)
+    print(f"Generated: {len(wavs[0])/sr:.1f}s → {OUT_FILE}")
 
-def play(path):
-    print("Playing...")
+    del model; gc.collect(); torch.cuda.empty_cache()
+
+
+def play():
+    print("Playing back...")
     subprocess.run([
-        "ffmpeg", "-i", path, "-ar", "48000", "-ac", "2",
-        "-f", "alsa", SPEAKER_DEVICE
-    ], check=True)
+        "ffmpeg", "-y", "-i", OUT_FILE, "-ar", "48000", "-ac", "2",
+        "-f", "alsa", SPEAKER,
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
 
 if __name__ == "__main__":
-    ref_wav = "/tmp/qwen_ref.wav"
-    out_wav = "/tmp/qwen_clone.wav"
-    ref_text = sys.argv[1] if len(sys.argv) > 1 else input("Reference transcript: ")
-    gen_text = sys.argv[2] if len(sys.argv) > 2 else input("Text to synthesize: ")
-
-    record(ref_wav)
-    clone(ref_wav, ref_text, out_wav, gen_text)
-    play(out_wav)
+    text = sys.argv[1] if len(sys.argv) > 1 else "Hello! This is my cloned voice."
+    record()
+    clone(text)
+    play()
+    print("Done.")
