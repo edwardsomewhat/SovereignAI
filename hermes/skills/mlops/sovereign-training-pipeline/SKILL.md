@@ -89,10 +89,13 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 26 May 2026 (cron #2) | 154 | 31 | 31 | 1 | 30 |
 | 27 May 2026 (cron) | 158 | 18 | 34 | 0 | 34 |
 | 27 May 2026 (cron #2) | 160 | 36 | 36 | 0 | 36 |
+| 27 May 2026 (cron #3) | 162 | 38 | 38 | 1 | 37 |
 
-The ~15% re-summarization rate from the pre-fix era is now gone — the curated-path skip (applied in the code) prevents re-processing already-kept sessions. *Orphaned processed files* from interrupted runs can still cause graded > summarized, but this run was clean (36 == 36).
+The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
 
-**⚠️ 27 May: Two consecutive 0-keeper runs (34 graded → 0 kept, then 36 graded → 0 kept).** This is no longer a one-off. The qwen3.5 thinking model is clearly drowning the grade letter in chain-of-thought, and `stage_grade()`'s `.strip().upper()` on the full response isn't reliably extracting it. Two full runs with zero keepers despite 70 graded files is a strong signal to try a non-thinking model or add `num_predict: 5` to cap output (see `references/verbose-grading-output.md` fix option 4).
+*Orphaned processed files* from interrupted runs can also cause graded > summarized in the same run.
+
+**⚠️ Low keeper rate (0–1 per run).** Out of the last 3 runs totaling 108 graded files, only 1 was kept (B grade). This is not a grade-extraction bug — `stage_grade()`'s `.strip().upper()` on the full response reliably finds the letter in qwen3.5's verbose output. The real issue is that most sessions are genuinely C/D quality: cron job executions, pipeline runs, and single-tool-call sessions dominate the corpus. The 1 keeper was a session demonstrating digital-autarky reasoning and timeout/security conflict resolution — a non-trivial workflow (B), not an A-level architecture decision. Expect 0–2 keepers per run going forward; the pipeline is working correctly, the training data is just sparse.
 
 ### Fix
 In `stage_summarize()`, add a curated-path skip before the LLM call:
@@ -114,7 +117,7 @@ See `references/re-summarization-bug.md` for full root-cause analysis and reprod
 - Timeout: 120s per call (set in `call_ollama()`)
 - Summarize prompt: ~200-400 tokens in → ~100 tokens out (5-field template)
 - Grade prompt: ~100 tokens in → **~500-2000 tokens out** (qwen3.5 ignores "return ONLY the letter" and outputs full reasoning chains)
-- Real-world performance: each file requires 2 LLM calls (summarize + grade). Budget ~90s per call at normal Ollama load, so total wall-clock ≈ `num_files × 180s`. Observed runs: 11 files in ~18 min (May 2026), 16 files in ~23 min (May 2026), 18 files in ~20-25 min (May 2026 — all graded C/D), 20 files in ~23 min (May 2026 — all graded C/D), 52 calls (18 summarize + 34 grade) in ~13 min (27 May — ~15s/call, much faster than typical). Times vary with Ollama load; budget ~100s per LLM call for conservative planning, but recent performance suggests ~15-20s per call at low load.
+- Real-world performance: each file requires 2 LLM calls (summarize + grade). Budget ~90s per call at normal Ollama load, so total wall-clock ≈ `num_files × 180s`. Observed runs: 11 files in ~18 min (May 2026), 16 files in ~23 min (May 2026), 18 files in ~20-25 min (May 2026 — all graded C/D), 20 files in ~23 min (May 2026 — all graded C/D), 52 calls (18 summarize + 34 grade) in ~13 min (27 May — ~15s/call, much faster than typical). Times vary with Ollama load; budget ~100s per LLM call for conservative planning, but recent performance suggests ~15-40s per call depending on load: 52 calls in ~13 min (~15s/call, 27 May — light load), 76 calls in ~50 min (~40s/call, 27 May cron #3 — moderate load).
 
 ### Pitfall: qwen3.5 Ignores Concise Grading Instructions
 

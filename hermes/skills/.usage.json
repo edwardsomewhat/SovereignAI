@@ -159,14 +159,14 @@
     "archived_at": null,
     "created_at": "2026-05-23T16:35:38.412036+00:00",
     "created_by": "agent",
-    "last_patched_at": "2026-05-27T06:41:10.875427+00:00",
-    "last_used_at": "2026-05-27T06:41:17.460781+00:00",
-    "last_viewed_at": "2026-05-27T06:41:17.459627+00:00",
-    "patch_count": 30,
+    "last_patched_at": "2026-05-27T11:33:02.132433+00:00",
+    "last_used_at": "2026-05-27T11:32:56.293332+00:00",
+    "last_viewed_at": "2026-05-27T11:32:56.290224+00:00",
+    "patch_count": 34,
     "pinned": false,
     "state": "active",
-    "use_count": 32,
-    "view_count": 32
+    "use_count": 35,
+    "view_count": 35
   },
   "tailscale-mcp": {
     "archived_at": null,
