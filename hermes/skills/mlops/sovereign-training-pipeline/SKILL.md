@@ -97,11 +97,12 @@ The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept s
 
 **⚠️ Low keeper rate (0–1 per run).** Out of the last 3 runs totaling 108 graded files, only 1 was kept (B grade). This is not a grade-extraction bug — `stage_grade()`'s `.strip().upper()` on the full response reliably finds the letter in qwen3.5's verbose output. The real issue is that most sessions are genuinely C/D quality: cron job executions, pipeline runs, and single-tool-call sessions dominate the corpus. The 1 keeper was a session demonstrating digital-autarky reasoning and timeout/security conflict resolution — a non-trivial workflow (B), not an A-level architecture decision. Expect 0–2 keepers per run going forward; the pipeline is working correctly, the training data is just sparse.
 
-### Fix
-In `stage_summarize()`, add a curated-path skip before the LLM call:
+### Fix (already applied in code)
+
+The curated-path skip was added to `stage_summarize()` on 2026-05-27 (lines 187-189):
 
 ```python
-# In stage_summarize(), inside the for-loop, after the processed check:
+# Already in stage_summarize(), lines 187-189:
 curated_file = CURATED_DIR / f"{rf.stem}.txt"
 if curated_file.exists():
     continue
@@ -112,12 +113,39 @@ See `references/re-summarization-bug.md` for full root-cause analysis and reprod
 
 ## LLM Details
 
-- Endpoint: `http://100.84.92.74:11434` (configurable via `TRAINING_LLM_URL` env var)
+- Endpoint: `http://hq-ai:11434` (configurable via `TRAINING_LLM_URL` env var)
 - Model: `qwen3.5:9b` (configurable via `TRAINING_LLM_MODEL`)
 - Timeout: 120s per call (set in `call_ollama()`)
 - Summarize prompt: ~200-400 tokens in → ~100 tokens out (5-field template)
 - Grade prompt: ~100 tokens in → **~500-2000 tokens out** (qwen3.5 ignores "return ONLY the letter" and outputs full reasoning chains)
 - Real-world performance: each file requires 2 LLM calls (summarize + grade). Budget ~90s per call at normal Ollama load, so total wall-clock ≈ `num_files × 180s`. Observed runs: 11 files in ~18 min (May 2026), 16 files in ~23 min (May 2026), 18 files in ~20-25 min (May 2026 — all graded C/D), 20 files in ~23 min (May 2026 — all graded C/D), 52 calls (18 summarize + 34 grade) in ~13 min (27 May — ~15s/call, much faster than typical). Times vary with Ollama load; budget ~100s per LLM call for conservative planning, but recent performance suggests ~15-40s per call depending on load: 52 calls in ~13 min (~15s/call, 27 May — light load), 76 calls in ~50 min (~40s/call, 27 May cron #3 — moderate load).
+
+### ⚠️ Pitfall: IP Address Unreachable from This Node
+
+The hardcoded default LLM endpoint `http://100.84.92.74:11434` is **not reachable** from this node (hangs/times out). Use the Tailscale hostname instead: `http://hq-ai:11434`. Always pass `TRAINING_LLM_URL=http://hq-ai:11434` when running the pipeline:
+
+```bash
+TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 .../python training_pipeline.py all
+```
+
+Verify connectivity before running: `tailscale ping hq-ai`.
+
+### ⚠️ Pitfall: Cold Model Timeout (first run after Ollama restart)
+
+If the model `qwen3.5:9b` is not already loaded in Ollama memory (e.g., after an Ollama restart), the first `/api/generate` call will **time out at 120s** while the model loads. The `/api/tags` GET endpoint returns instantly because it doesn't trigger model loading — do not mistake a successful tags check for pipeline readiness.
+
+**Warm-up test** before running the pipeline:
+```bash
+./venv/bin/python -c "
+import urllib.request, json
+req = urllib.request.Request('http://hq-ai:11434/api/generate',
+    data=json.dumps({'model':'qwen3.5:9b','prompt':'ping','stream':False,'options':{'num_predict':5}}).encode(),
+    headers={'Content-Type':'application/json'})
+print(json.loads(urllib.request.urlopen(req, timeout=30).read()).get('response','') or 'warm')
+"
+```
+
+If it returns within ~30s, the model is loaded and the pipeline will run. Otherwise, let it finish (up to 120s), then re-run the pipeline — the model stays warm for subsequent calls.
 
 ### Pitfall: qwen3.5 Ignores Concise Grading Instructions
 
