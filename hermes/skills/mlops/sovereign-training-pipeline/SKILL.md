@@ -87,8 +87,11 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 25 May 2026 (cron #3) | 145 | 13 | 29 | 1 | 28 |
 | 26 May 2026 (cron) | 152 | 14 | 31 | 2 | 29 |
 | 26 May 2026 (cron #2) | 154 | 31 | 31 | 1 | 30 |
+| 27 May 2026 (cron) | 158 | 18 | 34 | 0 | 34 |
 
-The ~15% re-summarization rate from the pre-fix era is now gone — the curated-path skip (applied in the code) prevents re-processing already-kept sessions. However, *orphaned processed files* from interrupted runs accumulate in `processed/` and get graded on the next complete run, causing the graded count to exceed the summarized count (e.g., 13 summarized but 29 graded — 16 orphaned from a prior interrupted run). When no orphaned files exist (e.g., 26 May cron #2), summarized == graded — a clean run. The "0 kept" streak is not a rule — keepers are possible but rare given the C/D-heavy grading rubric.
+The ~15% re-summarization rate from the pre-fix era is now gone — the curated-path skip (applied in the code) prevents re-processing already-kept sessions. However, *orphaned processed files* from interrupted runs accumulate in `processed/` and get graded on the next complete run, causing the graded count to exceed the summarized count (e.g., 13 summarized but 29 graded — 16 orphaned from a prior interrupted run). When no orphaned files exist (e.g., 26 May cron #2), summarized == graded — a clean run. The 0-kept streak is not a rule — keepers are possible but rare given the C/D-heavy grading rubric.
+
+**⚠️ 27 May: 34 graded, 0 kept.** This is the first all-delete run (previous runs had 1-2 keepers). Likely cause: the qwen3.5 thinking model may have been upgraded to a newer variant that puts even more chain-of-thought into the response field, drowning the actual grade letter. If this persists across multiple runs, consider switching to a non-thinking model for grading (see `references/verbose-grading-output.md` fix option 4).
 
 ### Fix
 In `stage_summarize()`, add a curated-path skip before the LLM call:
@@ -110,7 +113,7 @@ See `references/re-summarization-bug.md` for full root-cause analysis and reprod
 - Timeout: 120s per call (set in `call_ollama()`)
 - Summarize prompt: ~200-400 tokens in → ~100 tokens out (5-field template)
 - Grade prompt: ~100 tokens in → **~500-2000 tokens out** (qwen3.5 ignores "return ONLY the letter" and outputs full reasoning chains)
-- Real-world performance: each file requires 2 LLM calls (summarize + grade). Budget ~90s per call at normal Ollama load, so total wall-clock ≈ `num_files × 180s`. Observed runs: 11 files in ~18 min (May 2026), 16 files in ~23 min (May 2026), 18 files in ~20-25 min (May 2026 — all graded C/D), 20 files in ~23 min (May 2026 — all graded C/D). Times vary with Ollama load; budget ~100s per LLM call for conservative planning.
+- Real-world performance: each file requires 2 LLM calls (summarize + grade). Budget ~90s per call at normal Ollama load, so total wall-clock ≈ `num_files × 180s`. Observed runs: 11 files in ~18 min (May 2026), 16 files in ~23 min (May 2026), 18 files in ~20-25 min (May 2026 — all graded C/D), 20 files in ~23 min (May 2026 — all graded C/D), 52 calls (18 summarize + 34 grade) in ~13 min (27 May — ~15s/call, much faster than typical). Times vary with Ollama load; budget ~100s per LLM call for conservative planning, but recent performance suggests ~15-20s per call at low load.
 
 ### Pitfall: qwen3.5 Ignores Concise Grading Instructions
 

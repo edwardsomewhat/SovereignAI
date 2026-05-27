@@ -41,11 +41,16 @@ The pipeline works because it takes the **last non-empty line** or the full resp
 3. **Different prompt**: Use a system prompt that the model can't "reason around" — e.g., `"You are a classifier. Output exactly one character: A, B, C, or D."`
 4. **Different model**: A non-thinking model (e.g., `qwen3.5:3b` or a non-thinking variant) for grading only
 
-## Impact on This Run (2026-05-24)
+## Impact on Recent Runs
 
-| Metric | Expected | Actual |
-|--------|----------|--------|
-| Grade time per file | 1-3s | 20-40s |
-| Total grade stage | ~30s | ~8 min |
-| Output tokens per grade | 1 | 500-2000 |
-| Process log lines | ~15 | 492 |
+| Date | Graded | Kept | Notes |
+|------|--------|------|-------|
+| 24 May | 18 | 0 | All C/D |
+| 25 May (cron) | 22 | 1 | First keeper |
+| 25 May (cron #2) | 23 | 1 | |
+| 25 May (cron #3) | 29 | 1 | Orphaned files from interrupt |
+| 26 May (cron) | 31 | 2 | Best keeper rate (6.5%) |
+| 26 May (cron #2) | 31 | 1 | Clean run |
+| 27 May (cron) | 34 | 0 | First all-delete since 24 May; model possibly upgraded |
+
+**⚠️ 27 May observation:** All 34 graded files received C/D. Previous runs consistently had 1-2 keepers. The model may have been upgraded to a newer thinking variant where the chain-of-thought completely takes over the response field, burying the grade letter beyond what `.strip().upper()` can recover.
