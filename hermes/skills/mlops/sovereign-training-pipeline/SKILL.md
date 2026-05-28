@@ -82,8 +82,9 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 |------|-----|-----------|--------|------|---------|
 | 24 May 2026 | 129 | 18 | 18 | 0 | 18 |
 | 25 May 2026 (early) | 133 | 20 | 20 | 0 | 20 |
-| 25 May 2026 (cron) | 135 | 22 | 22 | 1 | 21 |
-| 25 May 2026 (cron #2) | 138 | 23 | 23 | 1 | 22 |
+| 28 May 2026 (cron) | 178 | 52 | 52 | 3 | 49 |
+| 28 May 2026 (cron #2) | 180 | 19 | 51 | 2 | 49 |
+The curated-path skip
 | 25 May 2026 (cron #3) | 145 | 13 | 29 | 1 | 28 |
 | 26 May 2026 (cron) | 152 | 14 | 31 | 2 | 29 |
 | 26 May 2026 (cron #2) | 154 | 31 | 31 | 1 | 30 |
@@ -91,7 +92,8 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 27 May 2026 (cron #2) | 160 | 36 | 36 | 0 | 36 |
 | 27 May 2026 (cron #3) | 162 | 38 | 38 | 1 | 37 |
 | 28 May 2026 (cron) | 178 | 52 | 52 | 3 | 49 |
-
+| 28 May 2026 (cron #2) | 180 | 19 | 51 | 2 | 49 |
+The curated-path skip
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
 
 *Orphaned processed files* from interrupted runs can also cause graded > summarized in the same run.
