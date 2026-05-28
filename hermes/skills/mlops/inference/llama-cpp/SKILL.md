@@ -1,7 +1,7 @@
 ---
 name: llama-cpp
 description: llama.cpp local GGUF inference + HF Hub model discovery.
-version: 2.1.2
+version: 2.2.0
 author: Orchestra Research
 license: MIT
 dependencies: [llama-cpp-python>=0.2.0]
@@ -56,6 +56,26 @@ Prefer URL workflows before asking for `hf`, Python, or custom scripts.
 
 ### Install llama.cpp
 
+**Pre-built Vulkan binaries (instant, no build tools)** — recommended for Linux
+NVIDIA when CUDA toolkit isn't installed or the GPU is CC < 7.5:
+
+```bash
+# Download latest Vulkan release (b9247+)
+curl -fsSL -O "https://github.com/ggml-org/llama.cpp/releases/download/b9247/llama-b9247-bin-ubuntu-vulkan-x64.tar.gz"
+tar xzf llama-b9247-bin-ubuntu-vulkan-x64.tar.gz
+cd llama-b9247
+
+# Launch with MTP
+./llama-server -hf <repo>:<quant> -ngl 99 --spec-type draft-mtp --spec-draft-n-max 6 \
+    --host 0.0.0.0 --port 8080
+```
+
+Vulkan performance is within 5-10% of CUDA on consumer GPUs (tested: Quadro
+P5000, CC 6.1, driver 535). No CUDA toolkit or nvcc required — just the
+NVIDIA driver with Vulkan ICD.
+
+**Build from source** (when CUDA toolkit is available):
+
 ```bash
 # macOS / Linux (simplest)
 brew install llama.cpp
@@ -68,7 +88,7 @@ winget install llama.cpp
 ```bash
 git clone https://github.com/ggml-org/llama.cpp
 cd llama.cpp
-cmake -B build
+cmake -B build -DGGML_CUDA=ON
 cmake --build build --config Release
 ```
 
@@ -232,9 +252,13 @@ Source URLs:
 
 - **[hub-discovery.md](references/hub-discovery.md)** - URL-only Hugging Face workflows, search patterns, GGUF extraction, and command reconstruction
 - **[advanced-usage.md](references/advanced-usage.md)** — speculative decoding, batched inference, grammar-constrained generation, LoRA, multi-GPU, custom builds, benchmark scripts
+- **[mtp-speculative-decoding.md](references/mtp-speculative-decoding.md)** — Multi-Token Prediction (MTP) status matrix: Qwen working, Gemma Mac-only, DeepSeek unsupported, model repos, benchmarks, pitfalls
+- **[model-swap-pattern.md](references/model-swap-pattern.md)** — Single-GPU model swapping: kill old server, start new with correct MTP flags, inventory tracking. **Now includes MTP model catalog with HF search URLs, supported model families, and GPU VRAM spillover behavior.**
 - **[quantization.md](references/quantization.md)** — quant quality tradeoffs, when to use Q4/Q5/Q6/IQ, model size scaling, imatrix
 - **[server.md](references/server.md)** — direct-from-Hub server launch, OpenAI API endpoints, Docker deployment, NGINX load balancing, monitoring
+- **[coexisting-with-ollama.md](references/coexisting-with-ollama.md)** — running llama.cpp alongside Ollama on the same GPU, port layout, VRAM sharing, storage considerations, systemd service template
 - **[optimization.md](references/optimization.md)** — CPU threading, BLAS, GPU offload heuristics, batch tuning, benchmarks
+- **[troubleshooting.md](references/troubleshooting.md)** — install/convert/quantize/inference/server issues, Apple Silicon, debugging
 - **[troubleshooting.md](references/troubleshooting.md)** — install/convert/quantize/inference/server issues, Apple Silicon, debugging
 
 ## Resources

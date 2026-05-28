@@ -182,6 +182,12 @@ Use `git add -A && git commit -m "<message>" && git push origin main` for initia
 
 For one-off bootstraps or rapid prototyping, you can SSH directly into the target node without creating a git repo first. Install Hermes, configure the provider, copy skills/persona/MCP servers, and verify — all over SSH. Full sequence in `references/direct-ssh-bootstrap.md`. This is faster for 1-2 nodes; for 3+ nodes, prefer the git repo pattern above.
 
+## Node-Type-Specific Setup
+
+Some node types need ML framework installation before they can run Hermes workloads:
+
+- **Jetson Orin (vision/TTS nodes):** CUDA PyTorch requires the NVIDIA JetPack wheel + cusparselt — standard `pip install torch` gives a CPU-only build. See `references/jetson-orin-cuda-torch.md` for the full JetPack 6 / R36 install sequence.
+
 ## Common Pitfalls
 
 1. **Committing .env or secrets.** The `.env` file contains API keys and the GITHUB_TOKEN. Always gitignore it. Triple-check before commit with `git diff --cached --name-only | grep -i env`.

@@ -1,7 +1,7 @@
 ---
 name: comfyui
 description: "Generate images, video, and audio with ComfyUI — install, launch, manage nodes/models, run workflows with parameter injection. Uses the official comfy-cli for lifecycle and direct REST/WebSocket API for execution."
-version: 5.5.0
+version: 5.1.0
 author: [kshitijk4poor, alt-glitch, purzbeats]
 license: MIT
 platforms: [macos, linux, windows]
@@ -41,27 +41,21 @@ for workflow execution.
 - `rest-api.md` — REST + WebSocket endpoints (local + cloud), payload schemas
 - `workflow-format.md` — API-format JSON, common node types, param mapping
 - `template-integrity.md` — converting `comfyui-workflow-templates` from
-  editor format to API format: Reroute bypass, dotted dynamic-input keys
+  editor format to API format
+- `telegram-delivery.md` — delivering generated images to Telegram bot: Reroute bypass, dotted dynamic-input keys
   (`values.a`, `resize_type.width`), Cloud quirks (302 redirect, 1 concurrent
   free-tier job, 1080p VRAM ceiling), Discord-compatible ffmpeg stitch.
   Authored by [@purzbeats](https://github.com/purzbeats). Load this whenever
   you're starting from an official template.
-- `remote-agent-architecture.md` — running the ComfyUI agent on a different
-  node than the GPU server. Covers Tailscale connectivity, `COMFY_HOST` env
-  var, `_common.py` patch, File Browser for output access, and the systemd
-  service pattern. Load this when the user wants autonomous agent access to
-  a remote ComfyUI instance.
-- `model-ecosystem.md` — canonical HuggingFace URLs for every model family:
-  Flux (checkpoint + CLIP/T5/VAE repos), Qwen Image Edit (2509/2511/Lightning
-  + LoRAs), Wan2.1 video (FLF2V/I2V/T2V fp8), LTX-Video (2B/13B distilled).
-  Load this before hunting down model download URLs — most models are in
-  non-obvious Comfy-Org repacks or community mirrors.
-- `qwen-image-edit-setup.md` — canonical Qwen Image Edit pipeline (May 2026):
-  GGUF model loading, lenML nodes for pixel-offset fix, CLIP type `qwen_image`
-  requirement, Lightning LoRA for 4-step generation, resolution alignment rules,
-  multi-image reference editing. Load this when the user wants Qwen-based image
-  editing — the pipeline has subtle requirements that differ from standard
-  SD/Flux workflows.
+- `telegram-delivery.md` — end-to-end ComfyUI → Telegram pipeline: workflow
+  submission, polling, image download, sendPhoto via bot API. Includes seed
+  determinism note and VRAM headroom check.
+- `conchai-model-inventory.md` — full inventory of all models installed on
+  Conchai's ComfyUI (45+ models, sizes, VRAM budget estimates). Use before
+  probing the server to see what's available.
+- `telegram-delivery.md` — end-to-end pipeline: ComfyUI submission → poll
+  completion → scp output → Telegram sendPhoto via Bot API. Step-by-step with
+  real session example.
 
 **Scripts (`scripts/`):**
 
@@ -243,6 +237,7 @@ The scripts emit JSON to stdout describing every output file:
 | "what's in the queue?" | REST | `curl http://HOST:8188/queue` (local) or `--host https://cloud.comfy.org` |
 | "cancel that" | REST | `curl -X POST http://HOST:8188/interrupt` |
 | "free GPU memory" | REST | `curl -X POST http://HOST:8188/free` |
+| "review my workflow" (user queues from UI) | REST | `GET /history/{prompt_id}` → read workflow JSON, analyze, suggest |
 
 ## Setup & Onboarding
 
@@ -453,22 +448,10 @@ comfy model download \
   --url "https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors" \
   --relative-path models/checkpoints
 
-# Flux Dev fp8 (diffusion model, ~12 GB) — use wget; comfy-cli hangs on large files
-wget -c -O models/checkpoints/flux1-dev-fp8.safetensors \
-  "https://huggingface.co/Comfy-Org/flux1-dev/resolve/main/flux1-dev-fp8.safetensors"
-
-# Flux text encoders (REQUIRED for Flux — NOT in Comfy-Org/flux1-dev)
-# Correct source: comfyanonymous/flux_text_encoders
-comfy --skip-prompt model download \
-  --url "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors" \
-  --relative-path models/clip
-comfy --skip-prompt model download \
-  --url "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors" \
-  --relative-path models/clip
-
-# Flux VAE — both BFL repos are gated; use an open community mirror
-wget -c -O models/vae/ae.safetensors \
-  "https://huggingface.co/Kijai/flux-fp8/resolve/main/flux-vae-bf16.safetensors"
+# Flux Dev fp8 (smaller variant, ~12 GB)
+comfy model download \
+  --url "https://huggingface.co/Comfy-Org/flux1-dev/resolve/main/flux1-dev-fp8.safetensors" \
+  --relative-path models/checkpoints
 
 # CivitAI (set token first):
 comfy model download \
@@ -483,13 +466,9 @@ List installed: `comfy model list`.
 
 ```bash
 comfy node install comfyui-impact-pack             # popular utility pack
+comfy node install comfyui-animatediff-evolved     # video generation
 comfy node install comfyui-controlnet-aux          # ControlNet preprocessors
-comfy node install comfyui-essentials              # common helpers (includes rembg)
-comfy node install ComfyUI-WanVideoWrapper         # Wan2.1 video generation
-comfy node install ComfyUI-WanVideoKsampler        # Wan2.1 sampling
-comfy node install ComfyUI-HunyuanVideoWrapper     # HunyuanVideo
-comfy node install comfyui-ltxvideo                # LTX-Video (Lightricks, fast)
-comfy node install ComfyUI-VideoHelperSuite        # video combine/split/format
+comfy node install comfyui-essentials              # common helpers
 comfy node update all
 comfy node install-deps --workflow=workflow.json   # install everything a workflow needs
 ```
@@ -581,16 +560,63 @@ python3 scripts/fetch_logs.py --tail-queue --host https://cloud.comfy.org
 
 ## Pitfalls
 
+0. **_comment and _meta fields cause 500 errors** — Workflow JSON exported from
+   ComfyUI's web UI often contains top-level `_comment` keys and per-node `_meta`
+   sub-objects. These cause HTTP 500 on submission to `/api/prompt`. Strip before
+   sending: `wf.pop('_comment', None)` and remove `_meta` from every node dict.
+   The `run_workflow.py` script handles this automatically, but if sending workflows
+   via `curl` or custom Python, you must strip these fields yourself. Simple test:
+   submit without `_comment`/`_meta` — if it works, those were the issue.
+
+15. **Git LFS pointer trap** — Models cloned from HuggingFace repos may be Git LFS
+    pointer files (~130 bytes of ASCII) instead of actual model weights (multi-GB
+    binary safetensors). Detection: `xxd model.safetensors | head -1` — if output
+    is binary hex, it's real; if it reads `version https://git-lfs.github.com/spec/v1...`,
+    it's a pointer. Fix: delete the pointer file, then re-download with
+    `wget -c 'URL?download=1'` (the `?download=1` parameter is critical — without it
+    HuggingFace serves the LFS pointer again). Do NOT use `wget -c` on an existing
+    pointer file; the resume logic confuses the tiny pointer with the full file.
+    Verify after download with `xxd` again. Real-world example: all three Wan 2.1
+    split models (t2v, i2v, flf2v) on Conchai were LFS pointers — 46GB total needed
+    re-download with the `?download=1` flag before they would load.
+
+15. **Git LFS pointer trap on HuggingFace-downloaded models** — Models cloned from HF repos
+    may be Git LFS pointer files (~130 bytes of ASCII) instead of actual weights (multi-GB
+    binary). **Detection:** `xxd model.safetensors | head -1` — binary hex header = real;
+    ASCII `version https://git-lfs.github.com/spec/v1...` = pointer. **Fix:** delete the
+    pointer file first, then `wget -c 'URL?download=1' -O model.safetensors`. The
+    `?download=1` parameter is critical — without it HF serves the pointer again. Do NOT
+    `wget -c` on an existing pointer; resume logic confuses the tiny file with the full
+    download. Always re-verify with `xxd` after download.
+
+    **Known affected on Conchai:** All three Wan 2.1 split models (t2v 14GB, i2v 16GB,
+    flf2v 16GB). Wan 2.2, HunyuanVideo, and Kandinsky5 models are real. Full inventory
+    at `references/conchai-model-reality.md`.
+
+    **Prevention:** when adding models, use `comfy model download` (handles LFS) or direct
+    `wget` with `?download=1`, never `git clone` from HF without `GIT_LFS_SKIP_SMUDGE=1`.
+
+14. **VRAM not freed after generation** — ComfyUI caches models in VRAM after generation
+    to avoid reload costs. This can leave 17+ GB occupied even with an empty queue.
+    Clear it: `curl -X POST http://HOST:8188/free -H "Content-Type: application/json" -d '{"unload_models": true, "free_memory": true}'`.
+    Verify with `/system_stats` — VRAM free should return to near total.
+
 1. **API format required** — every script and the `/api/prompt` endpoint expect
    API-format workflow JSON. The scripts detect editor format (top-level
    `nodes` and `links` arrays) and tell you to re-export via
    "Workflow → Export (API)" (newer UI) or "Save (API Format)" (older UI).
 
-2. **Server must be running** — all execution requires a live server.
+2. **SDTurboScheduler requires Turbo-tuned models** — `SDTurboScheduler` only
+   works with SD Turbo / LCM / Lightning models. Using it with standard SDXL
+   checkpoints (Juggernaut, Dreamshaper, etc.) causes the sampler to hang
+   indefinitely. For standard checkpoints, use `KSampler` with `dpmpp_2m` +
+   `karras` at 20 steps instead (~40s on RTX 3090 for 1024×1024).
+
+3. **Server must be running** — all execution requires a live server.
    `comfy launch --background` starts one. Verify with
    `curl http://127.0.0.1:8188/system_stats`.
 
-3. **Model names are exact** — case-sensitive, includes file extension.
+4. **Model names are exact** — case-sensitive, includes file extension.
    `check_deps.py` does fuzzy matching (with/without extension and folder
    prefix), but the workflow itself must use the canonical name. Use
    `comfy model list` to discover what's installed.
@@ -629,50 +655,81 @@ python3 scripts/fetch_logs.py --tail-queue --host https://cloud.comfy.org
     Use `comfy --skip-prompt tracking disable` to skip non-interactively.
     `comfyui_setup.sh` does this for you.
 
-12. **Workspace directory must not exist** — `comfy --workspace /path install` clones ComfyUI fresh into the target directory. If the directory already exists as a non-git directory, the error is `exists but is not a valid git repository`. `rm -rf` it and retry.
+12. **Flux 1 node wiring is NOT the same as SDXL** — When building Flux 1 workflows
+    programmatically (vs using the reference `workflows/flux_dev_txt2img.json`),
+    almost every node type and connection pattern is different:
 
-13. **--restore for missing dependencies** — If launch fails with `ModuleNotFoundError` (common: `sqlalchemy`, `alembic`), run `comfy install --nvidia --restore` to reinstall all Python requirements. The initial install can occasionally skip packages, especially on first-run venv setups.\n\n13a. **Model filename mismatches** — Workflow JSONs often reference canonical filenames (e.g. `flux1-dev.safetensors`, `t5xxl_fp16.safetensors`) that don't match your actual downloaded files (e.g. `flux1-dev-fp8.safetensors`, `t5xxl_fp8_e4m3fn.safetensors`). Create symlinks: `ln -sf actual_file.safetensors expected_name.safetensors`. Also, workflows using `UNETLoader` expect models in `models/unet/`; symlink from `models/checkpoints/` if needed: `ln -sf ../checkpoints/flux1-dev-fp8.safetensors models/unet/flux1-dev.safetensors`. Run `check_deps.py` after creating symlinks to verify resolution.
+    **Loader nodes:**
+    - `UNETLoader` needs `unet_name` (NOT `ckpt_name`) + `weight_dtype` (e.g. `"fp8_e4m3fn"`)
+    - CLIP needs a `DualCLIPLoader` node first (with `clip_name1`, `clip_name2`, `type: "flux"`),
+      then `CLIPTextEncode` references it via `clip: ["<dual_clip_node>", 0]` —
+      you can't pass clip filenames directly into CLIPTextEncode
+    - VAE needs a separate `VAELoader` node; `VAEDecode` references it via `vae: ["<vae_node>", 0]`
 
-14. **Systemd persistence** — For headless servers, create a systemd user service. Use the venv Python directly (`/workspace/.venv/bin/python main.py --listen 0.0.0.0 --port 8188`), not `comfy-cli launch`. Enable linger for unattended reboots: `sudo loginctl enable-linger $USER`. Copy and customize `templates/comfyui.service`.
+    **Scheduler / Guider / Sampler — all three separate nodes:**
+    - `BasicScheduler` outputs **only SIGMAS** — it does NOT output model/sampler/sigmas
+      as a bundle. Inputs: `model` (from UNETLoader), `scheduler`, `steps`, `denoise`.
+    - `CFGGuider` is a separate node: inputs `model` (from UNETLoader), `positive`
+      (CLIP encoding), `negative` (CLIP encoding), `cfg` (use 1.0 for Flux).
+    - `KSamplerSelect` is a separate node: input `sampler_name` (e.g. `"euler"`).
+    - `SamplerCustomAdvanced` wires them together: `noise` (RandomNoise), `guider`
+      (CFGGuider), `sampler` (KSamplerSelect), `sigmas` (BasicScheduler), `latent_image`
+      (latent creator).
+    - **Common mistake:** connecting BasicScheduler outputs [0], [1], [2] as
+      guider/sampler/sigmas respectively — this fails with "list index out of range"
+      because BasicScheduler only has ONE output (the sigmas at index 0).
 
-15. **Multi-drive storage** — Point `--workspace` to a dedicated data partition (e.g. `/mnt/hermes_data/comfy`) to keep models off root. Models consume 6–50+ GB each. **Never touch Windows/NTFS drives without explicit user confirmation** — ask first, name the specific drive.
+    **Latent image:**
+    - `EmptySD3LatentImage` works for Flux 1 (Flux 1 uses the same 16-channel latent
+      space as SD3). Use this when the `EmptyFluxLatentImage` custom node isn't installed.
+      Inputs: `width`, `height`, `batch_size`.
+    - `RandomNoise` outputs a `NOISE` type for `SamplerCustomAdvanced`.
 
-16. **Split/sharded model repos** — Some Comfy-Org models are split across multiple safetensors files (e.g. `split_files/diffusion_models/`). `comfy model download --url` expects a single file and returns 404. **DO NOT use git-lfs with glob patterns** — `git lfs pull -I "*.safetensors"` silently does nothing on these repos. The reliable method: `GIT_LFS_SKIP_SMUDGE=1 git clone <url>` to get the directory structure (LFS pointers only), then use `wget -c` with explicit HF resolve URLs for each file you need: `wget -c -O <local_path> "https://huggingface.co/<repo>/resolve/main/<path>"`. Full recipe in `references/split-model-download.md`.\n\n18a. **comfy-cli download hangs** — `comfy model download` can hang indefinitely on large files (12GB+) with 0 bytes transferred. Use wget directly as a fallback. The `--skip-prompt` flag is required for non-interactive use, but even with it, large downloads may stall.
+    **API format:**
+    - The workflow must be wrapped in `{"prompt": {...}}` — bare workflow JSON returns
+      `"no_prompt"` error.
 
-17. **Custom nodes not in Manager registry** — `comfy node install <name>` searches the ComfyUI Manager registry. If a node isn't indexed there (404), clone it from GitHub directly: `cd custom_nodes && git clone <url> && cd <dir> && .venv/bin/pip install -r requirements.txt`. Search GitHub with: `curl -s "https://api.github.com/search/repositories?q=comfyui+<keywords>&sort=stars"`.
+    Always start from the reference workflow in `workflows/flux_dev_txt2img.json`
+    and modify the prompt text + model filenames rather than building from scratch.
 
-18. **`--skip-prompt` required for non-interactive downloads** — `comfy model download` and other comfy-cli commands may try to read from stdin (interactive prompts). When running in background or via scripts, always add `--skip-prompt`: `comfy --skip-prompt model download --url ...`. Without it, downloads abort with \"Input is not a terminal\" or hang silently.
+13. **Inpainting with auto-masking (BiRefNet pipeline)** — For replacing backgrounds while
+    preserving a product/subject, use the automatic BiRefNet masking pipeline instead of
+    straight img2img (which will distort the subject):
 
-19. **Custom node names may not match Manager registry** — `comfy node install <name>` queries the ComfyUI Manager registry, but some well-known nodes use different titles/IDs than their GitHub repo names. Examples: `ComfyUI_IPAdapter_plus` and `ComfyUI_essentials` (titles in the registry JSON) are not installable via `comfy node install comfyui-ipadapter-plus` or `comfy node install comfyui-essentials`. When `comfy node install` returns \"not found in registry\" for a known node, clone directly: `cd custom_nodes && git clone <url> && cd <dir> && ../.venv/bin/pip install -r requirements.txt`. Search the registry JSON manually with `grep -i '<keyword>' .venv/lib/.../custom-node-list.json` to discover the correct title.
+    **Working pipeline (proven on Conchai v0.21.1):**
+    ```
+    LoadImage → BiRefNet_Loader → BiRefNet_Remove_Background → SplitImageWithAlpha
+    → InvertMask → VAEEncodeForInpaint → CheckpointLoaderSimple → CLIPTextEncode(×2)
+    → KSampler → VAEDecode → SaveImage
+    ```
 
-20. **Flux support models are NOT in Comfy-Org/flux1-dev** — That repo only contains the diffusion model (flux1-dev-fp8.safetensors) and split variants. The CLIP-L, T5 text encoder, and VAE files are in separate repos: `comfyanonymous/flux_text_encoders` (clip_l.safetensors, t5xxl_fp8_e4m3fn.safetensors) and `black-forest-labs/FLUX.1-schnell` (ae.safetensors). The `black-forest-labs/FLUX.1-dev` repo is gated and requires authentication; use the Schnell repo for the open VAE.
+    **Key nodes and their quirks:**
+    - `BiRefNet_Loader`: `model_version` must be one of `"BiRefNet_lite"`, `"BiRefNet_HR"`,
+      `"BiRefNet"`, etc. — NOT `"General"` or freeform strings. Use `"BiRefNet_lite"` for
+      speed on small images. `device`: `"cuda"`.
+    - `BiRefNet_Remove_Background`: outputs RGBA. `use_refine`: `true` for better edges.
+      `background_color`: `"black"`.
+    - `SplitImageWithAlpha`: splits RGBA into RGB image (index 0) + alpha mask (index 1).
+      The alpha mask = white(product) / black(background).
+    - `InvertMask` (NOT `MaskInvert` — that node doesn't exist): flips the mask so
+      white = regenerate / black = keep. Essential because inpainting expects white on
+      the area to replace.
+    - `VAEEncodeForInpaint`: `grow_mask_by`: 0 for exact mask, 2-4 for slight expansion
+      to avoid edge artifacts.
+    - `KSampler`: `denoise`: 1.0 (fully regenerate background). Steps 25-30, cfg 7.5.
 
-21. **git-lfs is unreliable for HF split-model repos — use wget instead** — Split-model repos (pitfall #16) can exceed 50 GB total. The documented approach of `GIT_LFS_SKIP_SMUDGE=1 git clone` + `git lfs pull -I <glob>` frequently fails: glob patterns silently match nothing (files remain LFS pointers), and `git lfs fetch --all` hangs with 0 bytes transferred. The reliable approach is to clone the repo structure only (for workflow JSON files) and download individual model files via wget:
-   ```bash
-   # Clone repo structure only (skip LFS)
-   cd models/
-   GIT_LFS_SKIP_SMUDGE=1 git clone <hf-repo-url> <folder-name>
-   # Download individual model files via wget — reliable and resumable
-   wget -c -O <folder-name>/split_files/diffusion_models/model.safetensors \
-     "https://huggingface.co/<repo>/resolve/main/split_files/diffusion_models/model.safetensors"
-   ```
-   For repos with ~10 files you need, wget each one explicitly. For repos with 50+ files, `git lfs pull` MAY work but expect it to hang; fall back to wget. The clone still provides workflow JSONs and directory structure even when LFS fails. This saves 30–80 GB of disk for repos with many precision variants (bf16, fp8, fp4, nvfp4).
+    **When auto-masking fails:** BiRefNet works best on clean, well-lit product photos
+    against contrasting backgrounds. Small, dark, or low-resolution images (under 512px)
+    may not detect the subject correctly. In those cases, provide a manual mask or use a
+    simpler approach (straight img2img with low denoise, or Qwen Image Edit for text-guided
+    background replacement).
 
-22. **comfy-cli hangs silently on large HF downloads** — `comfy model download` can stall indefinitely (0 bytes transferred, process alive but idle) for files >1 GB, especially when fetching from HuggingFace. The process has network sockets open but never begins the transfer. For large checkpoints (Flux, SDXL, SD3), skip comfy-cli and use `wget -c` directly: `wget -c -O models/checkpoints/NAME.safetensors "URL"`. The `-c` flag enables resume if the download is interrupted. This issue is distinct from the `--skip-prompt` interactive hang — adding `--skip-prompt` does not fix it.
-
-23. **Workflow save location for agent-created workflows** — Save workflow JSONs to `user/default/workflows/` under the ComfyUI workspace (e.g., `/mnt/hermes_data/comfy/user/default/workflows/`). The user loads them via ComfyUI web UI: Workflow → Open → browse to that path. Use descriptive filenames with date stamps: `glass_product_photo_2026-05-20.json`. If the directory doesn't exist, create it with `mkdir -p`. ComfyUI does not automatically index workflows server-side — workflows saved here appear in the file browser dialog, not the workflow templates tab. The orchestrator agent should write workflows to this path on the GPU node (via Tailscale SSH or open filesystem).
-
-24. **Post-download cleanup for split repos** — After wget downloads complete, remove git-lfs scaffolding left behind by the clone step: `rm -rf models/<repo>/.git` and `find models/ -name "*.safetensors" -size -1000c -delete` to purge LFS pointer files. Also clean incomplete downloads: `find models/ -name "*.part" -o -name "*.tmp" -delete`. Verify with `find models/ -name "*.safetensors" -size -1000c` — should return nothing. Only real model files should remain on disk.
-
-25. **`_meta` fields in API-format workflows cause 500 errors on ComfyUI 0.21.x** — Workflows exported with `_meta` keys on each node (`{\"class_type\": \"...\", \"_meta\": {\"title\": \"...\"}, \"inputs\": ...}`) will fail validation with `AttributeError: 'str' object has no attribute 'get'` in `execution.py:validate_prompt()`. The `_meta` field is a non-standard extension that newer ComfyUI versions handle but 0.21.x does not. **Strip all `_meta` keys before submitting**: `python3 -c \"import json; d=json.load(open('w.json')); [v.pop('_meta',None) for v in d.values() if isinstance(v,dict)]; json.dump(d, open('w.json','w'), indent=2)\"`. The skill's own `workflows/flux_dev_txt2img.json` may need this treatment depending on the target ComfyUI version. Also: always set `--host` when using `check_deps.py` against a remote server — it defaults to localhost.\n\n25a. **SamplerCustomAdvanced requires a KSamplerSelect node** — When building Flux workflows from scratch, the `SamplerCustomAdvanced` node expects a `SAMPLER`-type input on its `sampler` field. The `BasicScheduler` outputs `SIGMAS`, not `SAMPLER`. Insert a `KSamplerSelect` node (class_type: `KSamplerSelect`, inputs: `{\"sampler_name\": \"euler\"}`) between the scheduler and the sampler. Without it, validation fails with: `\"Return type mismatch between linked nodes\", \"sampler, received_type(SIGMAS) mismatch input_type(SAMPLER)\"`. The complete Flux chain: UNETLoader → BasicGuider + BasicScheduler + KSamplerSelect + RandomNoise + EmptySD3LatentImage → SamplerCustomAdvanced → VAEDecode → SaveImage.
-
-26. **First Flux run has PyTorch compilation overhead** — The first generation after server start takes 2-4x longer than subsequent runs. The `run_workflow.py` default timeout of 300s may expire before the model finishes compiling, while the image still generates successfully on the server. If the script times out but `curl http://HOST:8188/queue` shows the job cleared and `curl http://HOST:8188/history` shows the prompt_id with outputs, the generation succeeded — just retrieve the output directly from the ComfyUI output directory. **Always pass `--timeout 600` for Flux workflows** to give the compilation + inference enough headroom. For video workflows, pass `--timeout 1800`.
-
-27. **File Browser for headless output access** — When the user wants to browse ComfyUI outputs from any tailnet node without the ComfyUI web UI, deploy [filebrowser.org](https://filebrowser.org) as a lightweight web file manager. Key setup notes: (a) disable thumbnails (`--disableThumbnails`) or the UI hangs on image preview generation, (b) **noauth mode still requires at least one user** — `--auth.method=noauth` without any created user causes a 500 error on the login page; always run `filebrowser users add <user> <password> --perm.admin` even in noauth mode, (c) minimum password length is 12 characters, (d) run as a systemd user service pointed at the ComfyUI root directory (`--root=/mnt/hermes_data/comfy`), (e) listen on 0.0.0.0 for Tailscale access. Full recipe in `references/remote-agent-architecture.md`.
-
-28. **Video models don't generate audio** — Wan2.1, LTX-Video, and HunyuanVideo produce silent video only. For soundtracks, use the `audiocraft-audio-generation` skill (MusicGen for text-to-music) or Hermes' built-in TTS. ComfyUI audio nodes (`comfyui-sound-lab`, `DJ_VideoAudioMixer`) mix/process existing audio but don't generate it natively.
-
-30. **IPAdapter-Flux folder registration bug** — The `ComfyUI-IPAdapter-Flux` node registers `models/ipadapter-flux/` at import time using `folder_paths.supported_pt_extensions`, but the folder may fail to register on some ComfyUI versions (0.21.x). The `LoadFluxIPAdapter` dropdown shows an empty list. Additionally, the node expects `.pt` extension files; `.bin` files (common for IPAdapter weights) are invisible. Workaround: `ln -sf models/ipadapter-flux/ip-adapter.bin models/ipadapter-flux/ip-adapter.pt` then restart ComfyUI. If the dropdown still shows empty, the folder registration failed silently at import — check server startup logs for `ImportError` in that module.\n\n31. **`TextEncodeEditAdvancedDual` requires specific inputs** — This node (from `ComfyUi-TextEncodeQwenImageEditAdvanced`) requires `vl_megapixels` (FLOAT, typically 1.0) and `max_images_allowed` (one of \"0\", \"1\", \"2\", \"3\"). Images are wired to `image1`, `image2`, `image3` — NOT `image`. The `max_images_allowed` value must match the number of images actually wired. Outputs are CONDITIONING (positive) at index 0 and CONDITIONING (negative) at index 1 — no LATENT output. Qwen generates its own latent from `EmptyLatentImage`, not from VAE-encoding the input.
+14. **Node name gotchas** — Several ComfyUI custom nodes have subtly different names than
+    what you might guess:
+    - `InvertMask` exists; `MaskInvert` does NOT (→ "Node 'MaskInvert' not found")
+    - `BiRefNet_Loader` model_version: `"BiRefNet_lite"` exists; `"General"` does NOT
+    - `EmptySD3LatentImage` works for Flux 1; `EmptyFluxLatentImage` may not be installed
+    Always verify node names and parameter options against `/object_info` before submitting.
 
 ## Verification Checklist
 

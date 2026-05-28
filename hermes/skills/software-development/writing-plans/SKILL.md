@@ -270,6 +270,21 @@ git commit -m "type: description"
 **Bad:** "Create the model file"
 **Good:** "Create: `src/models/user.py`"
 
+### Python project scaffolding gotchas
+
+When planning multi-package Python projects, the `pyproject.toml` pytest config
+and PYTHONPATH setup are common failure points. See
+`references/python-project-scaffolding.md` for patterns and fixes (pytest
+`testpaths`/`pythonpath`, import resolution when cwd is the package dir, CLI
+relative-import guards). After scaffolding, always verify with
+`PYTHONPATH=.. python3 -c "import <pkg>; print('OK')"`.
+
+For a complete multi-phase build example (4 phases, 64 tests, pipeline
+architecture), see `references/shinobi-multi-phase-build.md`. (pytest
+`testpaths`/`pythonpath`, import resolution when cwd is the package dir, CLI
+relative-import guards). After scaffolding, always verify with
+`PYTHONPATH=.. python3 -c "import <pkg>; print('OK')"`.
+
 ## Execution Handoff
 
 After saving the plan, offer the execution approach:

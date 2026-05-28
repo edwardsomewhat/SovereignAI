@@ -297,6 +297,14 @@ terminal("pytest tests/test_feature.py::test_name -v")
 terminal("pytest tests/ -q")
 ```
 
+### Mock pitfalls
+
+When tests mock multi-call methods (e.g., dispatcher calling a runner N times),
+common Python `unittest.mock` gotchas can cause false passes or surprising
+failures. See `references/mock-patterns.md` for:
+- `@patch` target resolution (patch where defined, not where called)
+- `side_effect` with explicit `MagicMock` for multi-return mocks
+
 ### With delegate_task
 
 When dispatching subagents for implementation, enforce TDD in the goal:
