@@ -84,6 +84,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 25 May 2026 (early) | 133 | 20 | 20 | 0 | 20 |
 | 28 May 2026 (cron) | 178 | 52 | 52 | 3 | 49 |
 | 28 May 2026 (cron #2) | 180 | 19 | 51 | 2 | 49 |
+| 28 May 2026 (this run) | 182 | 27 | 49 | 0 | 49 |
 The curated-path skip
 | 25 May 2026 (cron #3) | 145 | 13 | 29 | 1 | 28 |
 | 26 May 2026 (cron) | 152 | 14 | 31 | 2 | 29 |
@@ -93,12 +94,15 @@ The curated-path skip
 | 27 May 2026 (cron #3) | 162 | 38 | 38 | 1 | 37 |
 | 28 May 2026 (cron) | 178 | 52 | 52 | 3 | 49 |
 | 28 May 2026 (cron #2) | 180 | 19 | 51 | 2 | 49 |
+| 28 May 2026 (this run) | 182 | 27 | 49 | 0 | 49 |
 The curated-path skip
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
 
 *Orphaned processed files* from interrupted runs can also cause graded > summarized in the same run.
 
-**⚠️ Low keeper rate (0–3 per run).** Across the last 4 runs totaling 160 graded files, 4 were kept (all B grade). This is not a grade-extraction bug — `stage_grade()`'s `.strip().upper()` on the full response reliably finds the letter in qwen3.5's verbose output. The real issue is that most sessions are genuinely C/D quality: cron job executions, pipeline runs, and single-tool-call sessions dominate the corpus. The keepers are sessions demonstrating digital-autarky reasoning, timeout/security conflict resolution, and non-trivial multi-turn workflows — all B grade, no A-level architecture decisions yet. Expect 0–3 keepers per run going forward; the pipeline is working correctly, the training data is just sparse.
+**⚠️ Low keeper rate (0–3 per run) — partially a grade-extraction bug.** `stage_grade()` checks `if grade in ("A", "B")` which is an **exact match** against the full response string — not a substring search. When qwen3.5 outputs 2000+ characters of thinking-chain reasoning, the full string never equals `"A"` or `"B"`, so even sessions the model internally considers A/B quality are silently deleted. The 1-3 keepers observed in some runs are sessions where the model happened to output just a bare letter (rare). Zero-keeper runs (this one: 0/49) occur when the model is verbose on every grading call.
+
+The genuine quality issue is real — cron job executions, pipeline runs, and single-tool-call sessions dominate the corpus and would be C/D even with correct parsing — but the extraction bug makes it impossible to know the true keeper rate. **Until the grade parsing is fixed (e.g., regex extract `[ABCD]` from the last line of output), the pipeline is silently discarding all A/B sessions alongside C/D.** See `references/verbose-grading-output.md` for root cause and fix options.
 
 ### Fix (already applied in code)
 
@@ -150,13 +154,15 @@ print(json.loads(urllib.request.urlopen(req, timeout=30).read()).get('response',
 
 If it returns within ~30s, the model is loaded and the pipeline will run. Otherwise, let it finish (up to 120s), then re-run the pipeline — the model stays warm for subsequent calls.
 
-### Pitfall: qwen3.5 Ignores Concise Grading Instructions
+### Pitfall: qwen3.5 Ignores Concise Grading Instructions (Grade-Extraction Bug)
 
-The grading system prompt says "Output ONLY the letter grade (A, B, C, or D). No explanation." The qwen3.5:9b model **completely ignores this** and outputs 500-2000 tokens of reasoning before (or instead of) the grade letter. The pipeline still works because `call_ollama()` returns the full response and `stage_grade()` takes `.strip().upper()` — the letter is somewhere in the response, typically on the last line.
+The grading system prompt says "Output ONLY the letter grade (A, B, C, or D). No explanation." The qwen3.5:9b model **completely ignores this** and outputs 500-2000 tokens of reasoning before (or instead of) the grade letter.
 
-This inflates grade stage time from a theoretical ~1-3s to ~60-120s per file and wastes Ollama throughput.
+**The pipeline does NOT recover from this.** `call_ollama()` returns the full response (including thinking chain), and `stage_grade()` does `grade in ("A", "B")` — an **exact match**, not a substring search. When the verbose response contains 2000+ characters, it never equals the single-letter strings `"A"` or `"B"`. Result: **all sessions are silently deleted, including those the model internally graded A/B.**
 
-**Workaround** (not yet applied in the pipeline): Strip reasoning by extracting only the first non-empty line, or regex for `[ABCD]`, or set `num_predict: 5` to cap output. See `references/verbose-grading-output.md` for real output samples.
+The 1-3 keepers observed in some past runs were sessions where the model happened to output a bare letter — this is luck, not the pipeline working. Zero-keeper runs (like this one: 0/49) are the norm when the model is consistently verbose.
+
+This also inflates grade stage time from a theoretical ~1-3s to ~60-120s per file.
 
 ## Grading Rubric
 

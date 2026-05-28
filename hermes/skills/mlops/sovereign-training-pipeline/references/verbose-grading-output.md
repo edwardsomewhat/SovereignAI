@@ -34,12 +34,29 @@ The pipeline works because it takes the **last non-empty line** or the full resp
 - The `call_ollama()` function already handles `response` vs `thinking` fields, but both contain reasoning
 - Simple "no explanation" instructions are systematically ignored by thinking-tuned models
 
+## Root Cause: `grade in ("A", "B")` Is an Exact Match, Not a Substring Search
+
+The grading code in `stage_grade()`:
+
+```python
+grade = call_ollama(text, system_prompt).strip().upper()
+if grade in ("A", "B"):
+    # keep
+else:
+    # delete
+```
+
+`grade in ("A", "B")` does an **exact match** of the full response against the single-letter strings `"A"` and `"B"`. When the model outputs 2000 characters of reasoning like `"THINKING PROCESS:\n...\nFINAL DECISION: B"`, the test fails — the full verbose string is not equal to `"A"` or `"B"`. **Both A/B and C/D sessions are deleted.**
+
+The 1-2 keepers observed in some runs were sessions where the model happened to output just a single letter (rare). The 0-keeper runs occur when the model is verbose on every grading call. The underlying session quality doesn't matter — even sessions the model internally grades B are lost.
+
 ## Fix Options (not yet applied)
 
 1. **Cap tokens**: `"num_predict": 5` in the Ollama payload for grade calls only — forces short output
-2. **Post-process**: Regex extract `[ABCD]` from the first 100 chars, fallback to last line
+2. **Post-process**: Regex extract `[ABCD]` from the response, or split on newline and take the last line before calling `.strip().upper()`. Most reliable for thinking models.
 3. **Different prompt**: Use a system prompt that the model can't "reason around" — e.g., `"You are a classifier. Output exactly one character: A, B, C, or D."`
-4. **Different model**: A non-thinking model (e.g., `qwen3.5:3b` or a non-thinking variant) for grading only
+4. **Different model**: A non-thinking model for grading only. qwen3.5 thinking variants systematically ignore "no explanation" instructions.
+5. **Parse thinking field separately**: For thinking models, Ollama returns `response` and `thinking` fields separately. The pipeline could read only `response` (the final answer token after thinking), not `thinking`. But qwen3.5 often puts the grade in `thinking` and leaves `response` empty — this needs testing.
 
 ## Impact on Recent Runs
 
@@ -51,6 +68,9 @@ The pipeline works because it takes the **last non-empty line** or the full resp
 | 25 May (cron #3) | 29 | 1 | Orphaned files from interrupt |
 | 26 May (cron) | 31 | 2 | Best keeper rate (6.5%) |
 | 26 May (cron #2) | 31 | 1 | Clean run |
-| 27 May (cron) | 34 | 0 | First all-delete since 24 May; model possibly upgraded |
-
-**⚠️ 27 May observation:** All 34 graded files received C/D. Previous runs consistently had 1-2 keepers. The model may have been upgraded to a newer thinking variant where the chain-of-thought completely takes over the response field, burying the grade letter beyond what `.strip().upper()` can recover.
+| 27 May (cron) | 34 | 0 | First all-delete since 24 May |
+| 27 May (cron #2) | 36 | 0 | |
+| 27 May (cron #3) | 38 | 1 | |
+| 28 May (cron) | 52 | 3 | |
+| 28 May (cron #2) | 51 | 2 | |
+| 28 May (this run) | 49 | 0 | All 49 deleted. Model verbose on every call. No sessions happened to output bare letters. |
