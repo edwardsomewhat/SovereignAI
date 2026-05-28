@@ -168,6 +168,8 @@ Supported platforms: Telegram, Discord, Slack, WhatsApp, Signal, Email, SMS, Mat
 
 Platform docs: https://hermes-agent.nousresearch.com/docs/user-guide/messaging/
 
+### Multi-node deployment: See `references/multi-node-deployment.md` — SSH key auth between nodes, GitHub SSH keys, rsync + Git for skill sync, sync script untracked-file bug fix.
+
 ### Dashboard-specific commands: See `references/dashboard-command.md` for detailed usage of `hermes dashboard` including network access via Tailscale and persistent operation.
 
 ### Multi-node sync: See `references/sovereign-repo-sync.md` for the SovereignAI git-based sync workflow between Hermes nodes.
@@ -904,7 +906,7 @@ Do NOT try to kill the PID directly — `hermes dashboard --stop` cleans up grac
 
 ### Telegram-specific issues
 
-**Token rejected by server.** The gateway logs show the exact token being used. Search for it:
+**"Unauthorized user" — user can't reach the bot.** `TELEGRAM_ALLOWED_USERS` must be the numeric Telegram user ID (e.g., `6311989610`), NOT the `@username` handle. The gateway compares against numeric IDs received from Telegram's API. Find your numeric ID via `@userinfobot` on Telegram or check the gateway log (`WARNING gateway.run: Unauthorized user: <numeric_id> (<username>)`). Fix with:\n```bash\nsed -i 's|^TELEGRAM_ALLOWED_USERS=.*|TELEGRAM_ALLOWED_USERS=<numeric_id>|' ~/.hermes/.env\nhermes gateway restart\n```\n\n**Token rejected by server.** The gateway logs show the exact token being used. Search for it:
 ```bash
 grep "InvalidToken\|token.*rejected" ~/.hermes/logs/gateway.log | tail -5
 ```

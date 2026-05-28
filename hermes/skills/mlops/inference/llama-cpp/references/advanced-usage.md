@@ -2,11 +2,6 @@
 
 ## Speculative Decoding
 
-> **Multi-Token Prediction (MTP)** — a newer form of speculative decoding where drafting
-> is built into the model architecture. See [`mtp-speculative-decoding.md`](mtp-speculative-decoding.md)
-> for the full MTP status matrix (Ollama, llama.cpp upstream, AtomicBot CUDA fork,
-> model compatibility, drafter GGUF repos, and benchmarks).
-
 ### Draft Model Approach
 
 ```bash

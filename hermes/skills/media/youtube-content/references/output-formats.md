@@ -54,34 +54,3 @@ Full article with:
 "The most important thing is not the model size, but the data quality." — 05:32
 "We found that scaling past 70B parameters gave diminishing returns." — 12:18
 ```
-
-## Briefing
-
-Deep analysis format designed for a domain-adjacent audience who understands the ideas but not all the jargon. Five required sections:
-
-```
-## 📋 Video Briefing: [Title]
-
-**Source:** [URL]  **Duration:** [MM:SS]  **Language:** [detected]
-
-## ① Plain-Language Summary
-2-4 paragraph narrative. Define every technical term on first use (inline, parenthetical).
-Tell the story: problem → approach → result → meaning.
-
-## ② Key Insights
-3-7 bullet points. Each states the insight in bold, explains why it matters, and
-flags if novel/controversial/widely-missed.
-
-## ③ Relevance to Our Work
-Explicit connections to SovereignAI and our stack. What maps, how to apply, caveats.
-Be honest if nothing maps directly.
-
-## ④ Technical Terms Glossary
-**term**: 1-2 sentence plain-language definition. 5-15 terms covering jargon, acronyms,
-framework names. Format as labeled list (not markdown table — Telegram doesn't render tables).
-
-## ⑤ Verdict
-One paragraph: is it worth watching? Who is it for? One thing to take away.
-```
-
-Tone: translate don't dumb down. Be direct about quality. No markdown tables.

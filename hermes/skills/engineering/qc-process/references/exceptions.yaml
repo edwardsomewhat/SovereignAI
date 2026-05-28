@@ -1,5 +1,0 @@
-# QC Learned Exceptions
-# Supervisor-approved overrides. QC skips SENSE CHECK escalation for these patterns.
-# Format: pattern_description | date | supervisor_notes
-
-exceptions: []

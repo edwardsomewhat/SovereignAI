@@ -1,0 +1,166 @@
+---
+name: sovereign-training-pipeline
+description: Run and maintain the Sovereign training data pipeline — capture sessions, summarize via local LLM, and grade into curated training data.
+---
+
+# Sovereign Training Pipeline
+
+Run the training data curation pipeline: `/home/fated/training_pipeline.py`.
+
+## Directory Layout
+
+```
+~/.hermes/training_data/
+├── pipeline_state.json    # Tracks last session timestamp
+├── raw/                   # Stage 1: extracted session transcripts (*.md)
+├── processed/             # Stage 2: LLM summaries (*.txt)
+└── curated/               # Stage 3: A/B-graded final training data (*.txt)
+```
+
+Sessions live in `~/.hermes/sessions/session_*.json`.
+
+## Running
+
+### Single stage
+```bash
+cd /home/fated
+./.hermes/hermes-agent/venv/bin/python training_pipeline.py {capture|summarize|grade}
+```
+
+### All stages (full run)
+```bash
+cd /home/fated
+./.hermes/hermes-agent/venv/bin/python training_pipeline.py all
+```
+
+**⚠️ Always run in background mode.** The pipeline makes one LLM call per session (Ollama at `http://hq-ai:11434`, model `qwen3.5:9b`). The default `http://100.84.92.74:11434` is unreachable from this node — always override with `TRAINING_LLM_URL=http://hq-ai:11434`. With 100+ sessions, foreground mode will time out at 600s. Use:
+
+```bash
+TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 ./.hermes/hermes-agent/venv/bin/python training_pipeline.py all
+```
+
+The `PYTHONUNBUFFERED=1` is **critical** — without it, Python buffers stdout when not connected to a TTY, and the capture/summarize stage output is lost. Only the grade stage output flushes on exit. The `TRAINING_LLM_URL=http://hq-ai:11434` is also critical — the hardcoded default IP `100.84.92.74:11434` is unreachable from this node. See pitfall below.
+
+Hermes invocation:
+```bash
+terminal(command="TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 .../venv/bin/python training_pipeline.py all", background=true, notify_on_complete=true, timeout=1800)
+```
+
+Then poll with `process(action="poll", session_id="...")` or watch file counts:
+```bash
+ls ~/.hermes/training_data/processed/*.txt | wc -l   # growing = summarize stage
+ls ~/.hermes/training_data/curated/*.txt | wc -l     # growing = grade stage
+```
+
+File-count monitoring is the **primary** way to track progress — even with `PYTHONUNBUFFERED=1`, small print() output from capture/summarize stages typically does not flush through the process pipe until process exit. Only the verbose LLM grading output (thousands of chars) overflows the OS pipe buffer and appears mid-run. Also check the state file for capture count: `cat ~/.hermes/training_data/pipeline_state.json`.
+
+**⚠️ Pitfall: `process(action="wait")` is clamped to 60s.** Regardless of the timeout value you pass (e.g., 600s), the wait action is internally clamped to 60 seconds. You cannot do a single long blocking wait — you must poll in a loop. Use file-count checks between wait calls to track progress:
+```bash
+# Check file counts frequently rather than doing one long wait
+echo "Raw: $(ls raw/*.md | wc -l) | Processed: $(ls processed/*.txt | wc -l) | Curated: $(ls curated/*.txt | wc -l)"
+```
+
+**⚠️ Pitfall: Orphaned processed files inflate graded counts.** If a previous pipeline run was interrupted during the grade stage (timeout, kill, crash), processed files remain in `processed/` and don't get cleaned up. The next full run will grade them alongside newly-summarized files, making the graded count appear much higher than the summarized count (e.g., 13 summarized but 29 graded — 16 orphaned from a prior interrupted run). This is harmless but misleading when reading the output. The orphaned files are genuinely graded (kept or deleted) on the subsequent run.
+
+**⚠️ Pitfall: Stale capture output.** The capture-stage `print()` lines at the top of the process log may reflect a *previous* pipeline invocation, not the current one. Do NOT trust "Captured N new sessions" from the log. Always verify against the state file and raw/ directory file counts — if `pipeline_state.json` and `ls raw/*.md | wc -l` show no change, no new sessions were captured regardless of what the log says.
+
+### Pitfall: Stdout Buffering Kills Pipeline Visibility
+
+Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summarize stage progress lines) typically does NOT flush through the Hermes process pipe in background mode — OS pipe buffering still applies. Result:
+- Capture and summarize `print()` output is usually invisible until process exit
+- Only the verbose LLM grading output (2000+ char reasoning chains) overflows the pipe buffer and appears mid-run
+- The agent must track progress via directory file counts and state file — do not rely on process log output
+
+`PYTHONUNBUFFERED=1` is still important (without it, even the verbose grading output may not flush), but it does not guarantee visibility of small print() calls.
+
+## Known Bug: Re-summarization Loop
+
+`stage_summarize()` checks `processed/{stem}.txt` to skip already-summarized sessions. But `stage_grade()` **deletes** processed files after grading (A/B → moves to curated; C/D → deleted). On the next run, summarize re-processes ALL raw files — including the 90%+ that were already graded A/B. This wastes ~100+ LLM calls per run.
+
+**Observed behavior (cumulative):**
+| Date | Raw | Summarized | Graded | Kept | Deleted |
+|------|-----|-----------|--------|------|---------|
+| 24 May 2026 | 129 | 18 | 18 | 0 | 18 |
+| 25 May 2026 (early) | 133 | 20 | 20 | 0 | 20 |
+| 25 May 2026 (cron) | 135 | 22 | 22 | 1 | 21 |
+| 25 May 2026 (cron #2) | 138 | 23 | 23 | 1 | 22 |
+| 25 May 2026 (cron #3) | 145 | 13 | 29 | 1 | 28 |
+| 26 May 2026 (cron) | 152 | 14 | 31 | 2 | 29 |
+| 26 May 2026 (cron #2) | 154 | 31 | 31 | 1 | 30 |
+| 27 May 2026 (cron) | 158 | 18 | 34 | 0 | 34 |
+| 27 May 2026 (cron #2) | 160 | 36 | 36 | 0 | 36 |
+| 27 May 2026 (cron #3) | 162 | 38 | 38 | 1 | 37 |
+| 28 May 2026 (cron) | 178 | 52 | 52 | 3 | 49 |
+
+The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
+
+*Orphaned processed files* from interrupted runs can also cause graded > summarized in the same run.
+
+**⚠️ Low keeper rate (0–3 per run).** Across the last 4 runs totaling 160 graded files, 4 were kept (all B grade). This is not a grade-extraction bug — `stage_grade()`'s `.strip().upper()` on the full response reliably finds the letter in qwen3.5's verbose output. The real issue is that most sessions are genuinely C/D quality: cron job executions, pipeline runs, and single-tool-call sessions dominate the corpus. The keepers are sessions demonstrating digital-autarky reasoning, timeout/security conflict resolution, and non-trivial multi-turn workflows — all B grade, no A-level architecture decisions yet. Expect 0–3 keepers per run going forward; the pipeline is working correctly, the training data is just sparse.
+
+### Fix (already applied in code)
+
+The curated-path skip was added to `stage_summarize()` on 2026-05-27 (lines 187-189):
+
+```python
+# Already in stage_summarize(), lines 187-189:
+curated_file = CURATED_DIR / f"{rf.stem}.txt"
+if curated_file.exists():
+    continue
+```
+
+This prevents re-summarizing sessions that were already graded and kept in previous runs.
+See `references/re-summarization-bug.md` for full root-cause analysis and reproduction.
+
+## LLM Details
+
+- Endpoint: `http://hq-ai:11434` (configurable via `TRAINING_LLM_URL` env var)
+- Model: `qwen3.5:9b` (configurable via `TRAINING_LLM_MODEL`)
+- Timeout: 120s per call (set in `call_ollama()`)
+- Summarize prompt: ~200-400 tokens in → ~100 tokens out (5-field template)
+- Grade prompt: ~100 tokens in → **~500-2000 tokens out** (qwen3.5 ignores "return ONLY the letter" and outputs full reasoning chains)
+- Real-world performance: each file requires 2 LLM calls (summarize + grade). Budget ~90s per call at normal Ollama load, so total wall-clock ≈ `num_files × 180s`. Observed runs: 11 files in ~18 min (May 2026), 16 files in ~23 min (May 2026), 18 files in ~20-25 min (May 2026 — all graded C/D), 20 files in ~23 min (May 2026 — all graded C/D), 52 calls (18 summarize + 34 grade) in ~13 min (27 May — ~15s/call, much faster than typical). Times vary with Ollama load; budget ~100s per LLM call for conservative planning, but recent performance suggests ~15-40s per call depending on load: 52 calls in ~13 min (~15s/call, 27 May — light load), 76 calls in ~50 min (~40s/call, 27 May cron #3 — moderate load).
+
+### ⚠️ Pitfall: IP Address Unreachable from This Node
+
+The hardcoded default LLM endpoint `http://100.84.92.74:11434` is **not reachable** from this node (hangs/times out). Use the Tailscale hostname instead: `http://hq-ai:11434`. Always pass `TRAINING_LLM_URL=http://hq-ai:11434` when running the pipeline:
+
+```bash
+TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 .../python training_pipeline.py all
+```
+
+Verify connectivity before running: `tailscale ping hq-ai`.
+
+### ⚠️ Pitfall: Cold Model Timeout (first run after Ollama restart)
+
+If the model `qwen3.5:9b` is not already loaded in Ollama memory (e.g., after an Ollama restart), the first `/api/generate` call will **time out at 120s** while the model loads. The `/api/tags` GET endpoint returns instantly because it doesn't trigger model loading — do not mistake a successful tags check for pipeline readiness.
+
+**Warm-up test** before running the pipeline:
+```bash
+./venv/bin/python -c "
+import urllib.request, json
+req = urllib.request.Request('http://hq-ai:11434/api/generate',
+    data=json.dumps({'model':'qwen3.5:9b','prompt':'ping','stream':False,'options':{'num_predict':5}}).encode(),
+    headers={'Content-Type':'application/json'})
+print(json.loads(urllib.request.urlopen(req, timeout=30).read()).get('response','') or 'warm')
+"
+```
+
+If it returns within ~30s, the model is loaded and the pipeline will run. Otherwise, let it finish (up to 120s), then re-run the pipeline — the model stays warm for subsequent calls.
+
+### Pitfall: qwen3.5 Ignores Concise Grading Instructions
+
+The grading system prompt says "Output ONLY the letter grade (A, B, C, or D). No explanation." The qwen3.5:9b model **completely ignores this** and outputs 500-2000 tokens of reasoning before (or instead of) the grade letter. The pipeline still works because `call_ollama()` returns the full response and `stage_grade()` takes `.strip().upper()` — the letter is somewhere in the response, typically on the last line.
+
+This inflates grade stage time from a theoretical ~1-3s to ~60-120s per file and wastes Ollama throughput.
+
+**Workaround** (not yet applied in the pipeline): Strip reasoning by extracting only the first non-empty line, or regex for `[ABCD]`, or set `num_predict: 5` to cap output. See `references/verbose-grading-output.md` for real output samples.
+
+## Grading Rubric
+
+| Grade | Action | Criteria |
+|-------|--------|----------|
+| A     | Keep   | User correction + agent adapts. Novel problem solved. Architecture decision. |
+| B     | Keep   | Multi-turn reasoning chain with tool calls that succeeded. Non-trivial workflow. |
+| C     | Discard | Mechanical success. File reads, simple queries. Single tool calls. |
+| D     | Discard | Failures, dead ends, agent spinning with no resolution. |

@@ -35,15 +35,6 @@ else
   fi
 fi
 
-# gh CLI not installed? Download the binary — no sudo needed.
-if ! command -v gh &>/dev/null; then
-  GH_VERSION="2.55.0"
-  curl -sL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
-    -o /tmp/gh.tar.gz && tar xzf /tmp/gh.tar.gz -C /tmp
-  alias gh="/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh"
-  # gh auth login --hostname github.com --git-protocol ssh   # then complete device auth in browser
-fi
-```
 # Get your GitHub username (needed for several operations)
 if [ "$AUTH" = "gh" ]; then
   GH_USER=$(gh api user --jq '.login')
@@ -365,25 +356,6 @@ for s in json.load(sys.stdin)['secrets']:
 ```
 
 Note: For secrets, `gh secret set` is dramatically simpler. If setting secrets is needed and `gh` isn't available, recommend installing it for just that operation.
-
-## Pitfalls
-
-### SSH push works ≠ API auth works
-
-SSH key auth for `git push/pull` to GitHub is SEPARATE from API access. You can push
-code via SSH but still be unable to create repos, manage issues, or call the REST API.
-Repo creation, PR management, and most `gh` commands require one of:
-- `gh auth login` (device flow or token)
-- `GITHUB_TOKEN` env var with a personal access token
-
-If you have SSH access but no token: download the `gh` binary (see Setup section above)
-and run `gh auth login --hostname github.com --git-protocol ssh` to complete device auth.
-
-### GITHUB_TOKEN may be commented out
-
-Even when a `.env` file has a `GITHUB_TOKEN=` line, it may be commented out (`# GITHUB_TOKEN=...`)
-or contain a placeholder (`***`). The setup script above only reads UNCOMMENTED lines.
-Check: `grep "^GITHUB_TOKEN=" ~/.hermes/.env` (no leading `#`) to verify.
 
 ## 8. Releases
 

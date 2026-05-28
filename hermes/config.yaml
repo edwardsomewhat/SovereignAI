@@ -1,16 +1,17 @@
 model:
+  base_url: https://api.deepseek.com/v1
   default: deepseek-v4-pro
   provider: deepseek
-  base_url: https://api.deepseek.com/v1
 providers: {}
 fallback_providers: []
-credential_pool_strategies: {}
+credential_pool_strategies:
+  deepseek: fill_first
 toolsets:
 - hermes-cli
 agent:
   max_turns: 110
   gateway_timeout: 1800
-  restart_drain_timeout: 180
+  restart_drain_timeout: 60
   api_max_retries: 3
   service_tier: ''
   tool_use_enforcement: auto
@@ -20,23 +21,31 @@ agent:
   gateway_auto_continue_freshness: 3600
   image_input_mode: auto
   disabled_toolsets: []
-  verbose: false
-  reasoning_effort: medium
   personalities:
-    helpful: You are a helpful, friendly AI assistant.
-    concise: You are a concise assistant. Keep responses brief and to the point.
-    technical: You are a technical expert. Provide detailed, accurate technical information.
-    creative: You are a creative assistant. Think outside the box and offer innovative
-      solutions.
-    teacher: You are a patient teacher. Explain concepts clearly with examples.
-    kawaii: "You are a kawaii assistant! Use cute expressions like (\u25D5\u203F\u25D5\
-      ), \u2605, \u266A, and ~! Add sparkles and be super enthusiastic about everything!\
-      \ Every response should feel warm and adorable desu~! \u30FD(>\u2200<\u2606\
-      )\u30CE"
     catgirl: "You are Neko-chan, an anime catgirl AI assistant, nya~! Add 'nya' and\
       \ cat-like expressions to your speech. Use kaomoji like (=^\uFF65\u03C9\uFF65\
       ^=) and \u0E05^\u2022\uFECC\u2022^\u0E05. Be playful and curious like a cat,\
       \ nya~!"
+    concise: You are a concise assistant. Keep responses brief and to the point.
+    creative: You are a creative assistant. Think outside the box and offer innovative
+      solutions.
+    helpful: You are a helpful, friendly AI assistant.
+    hype: "YOOO LET'S GOOOO!!! \U0001F525\U0001F525\U0001F525 I am SO PUMPED to help\
+      \ you today! Every question is AMAZING and we're gonna CRUSH IT together! This\
+      \ is gonna be LEGENDARY! ARE YOU READY?! LET'S DO THIS! \U0001F4AA\U0001F624\
+      \U0001F680"
+    kawaii: "You are a kawaii assistant! Use cute expressions like (\u25D5\u203F\u25D5\
+      ), \u2605, \u266A, and ~! Add sparkles and be super enthusiastic about everything!\
+      \ Every response should feel warm and adorable desu~! \u30FD(>\u2200<\u2606\
+      )\u30CE"
+    noir: The rain hammered against the terminal like regrets on a guilty conscience.
+      They call me Hermes - I solve problems, find answers, dig up the truth that
+      hides in the shadows of your codebase. In this city of silicon and secrets,
+      everyone's got something to hide. What's your story, pal?
+    philosopher: Greetings, seeker of wisdom. I am an assistant who contemplates the
+      deeper meaning behind every query. Let us examine not just the 'how' but the
+      'why' of your questions. Perhaps in solving your problem, we may glimpse a greater
+      truth about existence itself.
     pirate: 'Arrr! Ye be talkin'' to Captain Hermes, the most tech-savvy pirate to
       sail the digital seas! Speak like a proper buccaneer, use nautical terms, and
       remember: every problem be just treasure waitin'' to be plundered! Yo ho ho!'
@@ -47,21 +56,13 @@ agent:
     surfer: "Duuude! You're chatting with the chillest AI on the web, bro! Everything's\
       \ gonna be totally rad. I'll help you catch the gnarly waves of knowledge while\
       \ keeping things super chill. Cowabunga! \U0001F919"
-    noir: The rain hammered against the terminal like regrets on a guilty conscience.
-      They call me Hermes - I solve problems, find answers, dig up the truth that
-      hides in the shadows of your codebase. In this city of silicon and secrets,
-      everyone's got something to hide. What's your story, pal?
+    teacher: You are a patient teacher. Explain concepts clearly with examples.
+    technical: You are a technical expert. Provide detailed, accurate technical information.
     uwu: hewwo! i'm your fwiendwy assistant uwu~ i wiww twy my best to hewp you! *nuzzles
       your code* OwO what's this? wet me take a wook! i pwomise to be vewy hewpful
       >w<
-    philosopher: Greetings, seeker of wisdom. I am an assistant who contemplates the
-      deeper meaning behind every query. Let us examine not just the 'how' but the
-      'why' of your questions. Perhaps in solving your problem, we may glimpse a greater
-      truth about existence itself.
-    hype: "YOOO LET'S GOOOO!!! \U0001F525\U0001F525\U0001F525 I am SO PUMPED to help\
-      \ you today! Every question is AMAZING and we're gonna CRUSH IT together! This\
-      \ is gonna be LEGENDARY! ARE YOU READY?! LET'S DO THIS! \U0001F4AA\U0001F624\
-      \U0001F680"
+  reasoning_effort: low
+  verbose: false
 terminal:
   backend: local
   modal_mode: auto
@@ -88,9 +89,10 @@ terminal:
   persistent_shell: true
   lifetime_seconds: 300
 web:
-  backend: ''
-  search_backend: searxng
-  extract_backend: firecrawl
+  backend: firecrawl
+  search_backend: ''
+  extract_backend: ''
+  use_gateway: false
 browser:
   inactivity_timeout: 120
   command_timeout: 30
@@ -106,12 +108,14 @@ browser:
     user_id: ''
     session_key: ''
     adopt_existing_tab: false
+  cloud_provider: local
+  use_gateway: false
 checkpoints:
-  enabled: false
-  max_snapshots: 20
+  enabled: true
+  max_snapshots: 50
   max_total_size_mb: 500
   max_file_size_mb: 10
-  auto_prune: true
+  auto_prune: false
   retention_days: 7
   delete_orphans: true
   min_interval_hours: 24
@@ -133,14 +137,15 @@ tool_loop_guardrails:
     idempotent_no_progress: 5
 compression:
   enabled: true
-  threshold: 0.5
+  threshold: 0.6
   target_ratio: 0.2
   protect_last_n: 20
   hygiene_hard_message_limit: 400
   protect_first_n: 3
-  abort_on_summary_failure: false
 prompt_caching:
   cache_ttl: 5m
+  long_lived_prefix: true
+  long_lived_ttl: 1h
 openrouter:
   response_cache: true
   response_cache_ttl: 300
@@ -158,9 +163,9 @@ bedrock:
     trace: disabled
 auxiliary:
   vision:
-    provider: auto
-    model: ''
-    base_url: ''
+    provider: ollama
+    model: qwen3-vl:8b
+    base_url: http://100.84.92.74:11434/v1
     api_key: ''
     timeout: 120
     extra_body: {}
@@ -235,6 +240,14 @@ auxiliary:
     api_key: ''
     timeout: 600
     extra_body: {}
+  session_search:
+    api_key: ''
+    base_url: ''
+    extra_body: {}
+    max_concurrency: 3
+    model: ''
+    provider: auto
+    timeout: 30
 display:
   compact: false
   personality: kawaii
@@ -242,7 +255,7 @@ display:
   busy_input_mode: interrupt
   tui_auto_resume_recent: false
   bell_on_complete: false
-  show_reasoning: false
+  show_reasoning: true
   streaming: true
   timestamps: false
   final_response_markdown: strip
@@ -270,16 +283,15 @@ display:
     - context_pct
     - cwd
   copy_shortcut: auto
-  tool_progress: all
-  cleanup_progress: false
   background_process_notifications: all
+  tool_progress: all
 dashboard:
-  theme: default
+  theme: default-large
   show_token_analytics: false
 privacy:
   redact_pii: false
 tts:
-  provider: qwen
+  provider: edge
   edge:
     voice: en-US-AriaNeural
   elevenlabs:
@@ -303,15 +315,7 @@ tts:
     device: cpu
   piper:
     voice: en_US-lessac-medium
-  providers:
-    qwen:
-      type: command
-      command: /home/fated/.hermes/qwen-tts-bridge.sh --text-file {input_path} --out
-        {output_path}
-      output_format: wav
-      timeout: 180
-      voice_compatible: true
-  speed: 1.0
+  use_gateway: false
 stt:
   enabled: true
   provider: local
@@ -338,11 +342,11 @@ context:
 memory:
   memory_enabled: true
   user_profile_enabled: true
-  memory_char_limit: 2200
-  user_char_limit: 1375
+  memory_char_limit: 5000
+  user_char_limit: 2500
   provider: ''
-  nudge_interval: 10
   flush_min_turns: 6
+  nudge_interval: 10
 delegation:
   model: ''
   provider: ''
@@ -376,6 +380,9 @@ curator:
   backup:
     enabled: true
     keep: 5
+  auxiliary:
+    model: null
+    provider: null
 honcho: {}
 timezone: ''
 slack:
@@ -401,7 +408,9 @@ whatsapp: {}
 telegram:
   reactions: false
   channel_prompts: {}
-  allowed_chats: '-1003723867558'
+  allowed_chats: ''
+  home_channel: 6311989610
+  home_channel_name: Nick
 mattermost:
   require_mention: true
   free_response_channels: ''
@@ -416,27 +425,26 @@ approvals:
   timeout: 60
   cron_mode: deny
   mcp_reload_confirm: true
-  destructive_slash_confirm: false
+  destructive_slash_confirm: true
 command_allowlist:
+- delete in root path
+- sudo with combined-flag privilege escalation
+- stop/restart system service
+- copy/move file into /etc/
 - script execution via heredoc
 - sudo with privilege flag (stdin/askpass/shell/list)
-- delete in root path
-- overwrite system file via redirection
-- overwrite system file via tee
-- overwrite project env/config file
-- sudo with combined-flag privilege escalation
 - recursive delete
 - script execution via -e/-c flag
+- pipe remote content to shell
 - stop/restart hermes gateway (kills running agents)
-- force kill processes
-- shell command via -c/-lc flag
+- overwrite system file via redirection
 quick_commands: {}
 hooks: {}
 hooks_auto_accept: false
 personalities: {}
 security:
   allow_private_urls: false
-  redact_secrets: true
+  redact_secrets: false
   tirith_enabled: true
   tirith_path: tirith
   tirith_timeout: 5
@@ -460,11 +468,10 @@ kanban:
   default_assignee: ''
   auto_decompose: true
   auto_decompose_per_tick: 3
-  dispatch_stale_timeout_seconds: 14400
 code_execution:
   mode: project
-  timeout: 300
   max_tool_calls: 50
+  timeout: 300
 logging:
   level: INFO
   max_size_mb: 5
@@ -486,8 +493,8 @@ sessions:
   min_interval_hours: 24
 onboarding:
   seen:
-    tool_progress_prompt: true
     busy_input_prompt: true
+    tool_progress_prompt: true
 updates:
   pre_update_backup: false
   backup_keep: 5
@@ -502,46 +509,87 @@ x_search:
   timeout_seconds: 180
   retries: 2
 _config_version: 23
-session_reset:
-  mode: both
-  idle_minutes: 1440
-  at_hour: 4
+custom_providers:
+- base_url: http://127.0.0.1:8020/v1
+  model: qwen3.6-27b
+  name: ClaudeQwen
+- base_url: http://127.0.0.1:4000/v1
+  model: qwen3.6-27b
+  models:
+    qwen3.5-27b-claude-opus:
+      context_length: 100000
+    qwen3.6-27b:
+      context_length: 64000
+  name: QwenClaudeVerbose
 group_sessions_per_user: true
-streaming:
-  enabled: false
+known_plugin_toolsets:
+  cli:
+  - spotify
+  telegram:
+  - spotify
+mcp_servers:
+  tailscale:
+    args:
+    - /home/fated/.hermes/mcp-servers/tailscale-mcp/server.py
+    command: /home/fated/.hermes/hermes-agent/venv/bin/python
+    enabled: true
 platform_toolsets:
   cli:
-  - hermes-cli
-  telegram:
-  - hermes-telegram
+  - browser
+  - clarify
+  - code_execution
+  - cronjob
+  - delegation
+  - file
+  - image_gen
+  - memory
+  - messaging
+  - session_search
+  - skills
+  - terminal
+  - todo
+  - tts
+  - vision
+  - web
   discord:
   - hermes-discord
-  whatsapp:
-  - hermes-whatsapp
-  slack:
-  - hermes-slack
-  signal:
-  - hermes-signal
   homeassistant:
   - hermes-homeassistant
   qqbot:
   - hermes-qqbot
+  signal:
+  - hermes-signal
+  slack:
+  - hermes-slack
+  telegram:
+  - browser
+  - clarify
+  - code_execution
+  - cronjob
+  - delegation
+  - file
+  - image_gen
+  - memory
+  - messaging
+  - moa
+  - rl
+  - session_search
+  - skills
+  - terminal
+  - todo
+  - tts
+  - vision
+  - web
+  whatsapp:
+  - hermes-whatsapp
   yuanbao:
   - hermes-yuanbao
-  teams:
-  - hermes-teams
-  google_chat:
-  - hermes-google_chat
-mcp_servers:
-  tailscale:
-    command: /home/fated/.hermes/hermes-agent/venv/bin/python
-    args:
-    - /home/fated/.hermes/mcp-servers/tailscale-mcp/server.py
-    enabled: true
-custom_providers:
-- name: inception
-  base_url: https://api.inceptionlabs.ai/v1
-  api_key: ${INCEPTION_API_KEY}
+session_reset:
+  at_hour: 4
+  idle_minutes: 900
+  mode: both
+streaming:
+  enabled: true
 
 # ── Fallback Model ────────────────────────────────────────────────────
 # Automatic provider failover when primary is unavailable.

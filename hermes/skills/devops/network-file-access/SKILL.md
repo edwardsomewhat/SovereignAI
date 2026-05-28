@@ -216,18 +216,6 @@ This works because Tailscale manages the SSH session. No password prompt. For fi
 scp <tailscale-ip>:/path/to/file ./local-dest/
 ```
 
-### Preferred Cross-Node Access: Direct SSH Over Tailscale IP
-
-**Default to direct SSH (`ssh user@100.x.x.x`) from the terminal tool**, not the MCP Tailscale SSH tool. Direct SSH is faster, doesn't time out on model loads, and avoids host-key friction and ClosedResourceError drops. The MCP tool can be flaky under load.
-
-Use the tailnet IPs directly — they work regardless of hostname resolution:
-```bash
-ssh fated@100.84.92.74 "command"
-scp file fated@100.64.45.87:/home/fated/
-```
-
-For password-protected nodes, use `sshpass` (once installed) or set up SSH key auth after first contact.
-
 ### Taildrop (File Sharing)
 
 Taildrop lets you send files between Tailscale nodes. Requires operator permissions on the receiving node:
