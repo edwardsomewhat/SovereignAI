@@ -49,7 +49,7 @@ Return ONLY the letter grade (A, B, C, or D)."""
 
 # Local LLM endpoint (change to your Ollama/HQ IP)
 LLM_URL = os.environ.get("TRAINING_LLM_URL", "http://100.84.92.74:11434")
-LLM_MODEL = os.environ.get("TRAINING_LLM_MODEL", "qwen3.5:9b")
+LLM_MODEL = os.environ.get("TRAINING_LLM_MODEL", "hermes3:8b")
 
 
 def load_state():
@@ -94,7 +94,11 @@ def call_ollama(prompt, system=None):
         "model": LLM_MODEL,
         "prompt": prompt,
         "stream": False,
-        "options": {"temperature": 0.3, "num_predict": 1024}
+        "options": {
+            "temperature": 0.3,
+            "num_predict": 1024,
+            "num_ctx": 32768,   # cap context per-request (server default is 128K, too much VRAM)
+        }
     }
     if system:
         payload["system"] = system
@@ -219,7 +223,11 @@ Output ONLY the letter grade (A, B, C, or D). No explanation."""
     for pf in processed_files:
         text = pf.read_text()
         
-        grade = call_ollama(text, system_prompt).strip().upper()
+        grade_raw = call_ollama(text, system_prompt).strip().upper()
+        # Robust extraction: handles "A.", "Grade: B", "C", etc.
+        import re
+        match = re.search(r'[A-D]', grade_raw)
+        grade = match.group(0) if match else grade_raw
         
         if grade in ("A", "B"):
             dest = CURATED_DIR / pf.name
