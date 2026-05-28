@@ -90,12 +90,13 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 27 May 2026 (cron) | 158 | 18 | 34 | 0 | 34 |
 | 27 May 2026 (cron #2) | 160 | 36 | 36 | 0 | 36 |
 | 27 May 2026 (cron #3) | 162 | 38 | 38 | 1 | 37 |
+| 28 May 2026 (cron) | 178 | 52 | 52 | 3 | 49 |
 
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
 
 *Orphaned processed files* from interrupted runs can also cause graded > summarized in the same run.
 
-**⚠️ Low keeper rate (0–1 per run).** Out of the last 3 runs totaling 108 graded files, only 1 was kept (B grade). This is not a grade-extraction bug — `stage_grade()`'s `.strip().upper()` on the full response reliably finds the letter in qwen3.5's verbose output. The real issue is that most sessions are genuinely C/D quality: cron job executions, pipeline runs, and single-tool-call sessions dominate the corpus. The 1 keeper was a session demonstrating digital-autarky reasoning and timeout/security conflict resolution — a non-trivial workflow (B), not an A-level architecture decision. Expect 0–2 keepers per run going forward; the pipeline is working correctly, the training data is just sparse.
+**⚠️ Low keeper rate (0–3 per run).** Across the last 4 runs totaling 160 graded files, 4 were kept (all B grade). This is not a grade-extraction bug — `stage_grade()`'s `.strip().upper()` on the full response reliably finds the letter in qwen3.5's verbose output. The real issue is that most sessions are genuinely C/D quality: cron job executions, pipeline runs, and single-tool-call sessions dominate the corpus. The keepers are sessions demonstrating digital-autarky reasoning, timeout/security conflict resolution, and non-trivial multi-turn workflows — all B grade, no A-level architecture decisions yet. Expect 0–3 keepers per run going forward; the pipeline is working correctly, the training data is just sparse.
 
 ### Fix (already applied in code)
 
