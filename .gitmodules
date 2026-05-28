@@ -1,0 +1,3 @@
+[submodule "shinobi"]
+	path = shinobi
+	url = git@github.com:edwardsomewhat/PiNinja.git

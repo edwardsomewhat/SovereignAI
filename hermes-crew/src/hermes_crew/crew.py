@@ -152,9 +152,18 @@ class HermesCrew:
         )
 
     @agent
-    def creative(self) -> Agent:
+    def art_studio(self) -> Agent:
         return Agent(
-            config=self.agents_config["creative"],
+            config=self.agents_config["art_studio"],
+            llm=_get_llm(),
+            verbose=True,
+            allow_delegation=False,
+        )
+
+    @agent
+    def fab_studio(self) -> Agent:
+        return Agent(
+            config=self.agents_config["fab_studio"],
             llm=_get_llm(),
             verbose=True,
             allow_delegation=False,
@@ -201,8 +210,12 @@ class HermesCrew:
         return Task(config=self.tasks_config["vision_analysis"])
 
     @task
-    def creative_generation(self) -> Task:
-        return Task(config=self.tasks_config["creative_generation"])
+    def art_generation(self) -> Task:
+        return Task(config=self.tasks_config["art_generation"])
+
+    @task
+    def fabrication(self) -> Task:
+        return Task(config=self.tasks_config["fabrication"])
 
     @task
     def quality_gate(self) -> Task:
@@ -236,7 +249,8 @@ class HermesCrew:
             self.infra(),
             self.coders(),
             self.vision(),
-            self.creative(),
+            self.art_studio(),
+            self.fab_studio(),
             self.qa(),
         ]
 

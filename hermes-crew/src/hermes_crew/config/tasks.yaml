@@ -77,15 +77,34 @@ vision_analysis:
     the spec requires), plus container health confirmation and processing latency.
   agent: vision
 
-creative_generation:
+art_generation:
   description: >
-    Generate creative media via ComfyUI on conchai (primary, RTX 3060) or
-    hq-ai (fallback, P5000) for: {creative_spec}.
-    This may involve images, video, or audio depending on the request.
+    Generate visual creative media via ComfyUI on Conchai (primary, RTX 3090 24GB)
+    or hq-ai (fallback, P5000 16GB) for: {creative_spec}.
+    Capabilities: txt2img, img2img, inpainting, upscaling, batch variations,
+    text-to-video (Wan 2.2, HunyuanVideo 1.5), and audio generation.
+    Models available: Flux, SDXL, Juggernaut, Wan, HunyuanVideo, Kandinsky.
+    For text-based creative (copy, taglines, scripts), coordinate with Copy Studio.
+    For quality review, submit output to the Review Agent (qwen3-vl:8b on hq-ai).
   expected_output: >
     Generated media file paths or URLs, workflow used, generation parameters,
     and processing time. For images: include prompt, seed, model, and dimensions.
-  agent: creative
+    For video: include frame count, duration, model, and workflow.
+  agent: art_studio
+
+fabrication:
+  description: >
+    Process a 3D fabrication request via the Fab Studio pipeline: {fab_spec}.
+    Pipeline: analyze scanned OBJ from Creality Ferret → Florence 2 vision analysis
+    on Jetson Orin → generate parametric CAD in OpenSCAD → render STL/STEP output.
+    Use import() to reference scanned mesh as negative space where needed.
+    NOT diffusion 3D — this is engineering CAD for physical manufacturing.
+    Target use cases: arcade cabinets, TV boxes, e-scooter body panels, Hermes shell.
+  expected_output: >
+    OpenSCAD source file, rendered STL/STEP file path, Florence 2 analysis summary
+    of the scanned object, and dimensions/measurements used. Include render time
+    and any assumptions about the physical object's geometry.
+  agent: fab_studio
 
 quality_gate:
   description: >
