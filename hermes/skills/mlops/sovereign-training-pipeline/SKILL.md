@@ -5,7 +5,10 @@ description: Run and maintain the Sovereign training data pipeline — capture s
 
 # Sovereign Training Pipeline
 
-Run the training data curation pipeline: `/home/fated/training_pipeline.py`.
+Two approaches exist for producing fine-tuning data from Hermes Agent sessions:
+
+1. **Batch Session Mining** (this skill's primary focus) — post-hoc pipeline that extracts Hermes session DB transcripts, summarizes via local LLM, and grades into curated training data. Script: `~/training_pipeline.py`.
+2. **Real-time Proxy Capture** — Docker-based intercept proxy that sits between LLM clients and vLLM, capturing every conversation in ShareGPT format to PostgreSQL. See `references/proxy-capture.md`.
 
 ## Directory Layout
 
@@ -54,7 +57,7 @@ ls ~/.hermes/training_data/curated/*.txt | wc -l     # growing = grade stage
 
 File-count monitoring is the **primary** way to track progress — even with `PYTHONUNBUFFERED=1`, small print() output from capture/summarize stages typically does not flush through the process pipe until process exit. Only the verbose LLM grading output (thousands of chars) overflows the OS pipe buffer and appears mid-run. Also check the state file for capture count: `cat ~/.hermes/training_data/pipeline_state.json`.
 
-**⚠️ Pitfall: `process(action="wait")` is clamped to 60s.** Regardless of the timeout value you pass (e.g., 600s), the wait action is internally clamped to 60 seconds. You cannot do a single long blocking wait — you must poll in a loop. Use file-count checks between wait calls to track progress:
+**⚠️ Pitfall: `process(action="wait")` is clamped to 180s.** Regardless of the timeout value you pass (e.g., 600s or 1800s), the wait action is internally clamped to 180 seconds. You cannot do a single long blocking wait — you must poll in a loop. (Previously documented as 60s; raised to 180s as of late May 2026.) Use file-count checks between wait calls to track progress:
 ```bash
 # Check file counts frequently rather than doing one long wait
 echo "Raw: $(ls raw/*.md | wc -l) | Processed: $(ls processed/*.txt | wc -l) | Curated: $(ls curated/*.txt | wc -l)"
@@ -84,23 +87,13 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 25 May 2026 (early) | 133 | 20 | 20 | 0 | 20 |
 | 28 May 2026 (cron) | 178 | 52 | 52 | 3 | 49 |
 | 28 May 2026 (cron #2) | 180 | 19 | 51 | 2 | 49 |
-| 28 May 2026 (this run) | 182 | 27 | 49 | 0 | 49 |
-The curated-path skip
-| 25 May 2026 (cron #3) | 145 | 13 | 29 | 1 | 28 |
-| 26 May 2026 (cron) | 152 | 14 | 31 | 2 | 29 |
-| 26 May 2026 (cron #2) | 154 | 31 | 31 | 1 | 30 |
-| 27 May 2026 (cron) | 158 | 18 | 34 | 0 | 34 |
-| 27 May 2026 (cron #2) | 160 | 36 | 36 | 0 | 36 |
-| 27 May 2026 (cron #3) | 162 | 38 | 38 | 1 | 37 |
-| 28 May 2026 (cron) | 178 | 52 | 52 | 3 | 49 |
-| 28 May 2026 (cron #2) | 180 | 19 | 51 | 2 | 49 |
-| 28 May 2026 (this run) | 182 | 27 | 49 | 0 | 49 |
-The curated-path skip
+| 28 May 2026 (cron #4) | 185 | 18 | 54 | 3 | 51 |
+
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
 
 *Orphaned processed files* from interrupted runs can also cause graded > summarized in the same run.
 
-**⚠️ Low keeper rate (0–3 per run) — partially a grade-extraction bug.** `stage_grade()` checks `if grade in ("A", "B")` which is an **exact match** against the full response string — not a substring search. When qwen3.5 outputs 2000+ characters of thinking-chain reasoning, the full string never equals `"A"` or `"B"`, so even sessions the model internally considers A/B quality are silently deleted. The 1-3 keepers observed in some runs are sessions where the model happened to output just a bare letter (rare). Zero-keeper runs (this one: 0/49) occur when the model is verbose on every grading call.
+**⚠️ Low keeper rate (0–3 per run) — partially a grade-extraction bug.** `stage_grade()` checks `if grade in ("A", "B")` which is an **exact match** against the full response string — not a substring search. When qwen3.5 outputs 2000+ characters of thinking-chain reasoning, the full string never equals `"A"` or `"B"`, so even sessions the model internally considers A/B quality are silently deleted. The 1-3 keepers observed in some runs are sessions where the model happened to output just a bare letter (rare). Zero-keeper runs occur when the model is verbose on every grading call.
 
 The genuine quality issue is real — cron job executions, pipeline runs, and single-tool-call sessions dominate the corpus and would be C/D even with correct parsing — but the extraction bug makes it impossible to know the true keeper rate. **Until the grade parsing is fixed (e.g., regex extract `[ABCD]` from the last line of output), the pipeline is silently discarding all A/B sessions alongside C/D.** See `references/verbose-grading-output.md` for root cause and fix options.
 
@@ -125,7 +118,7 @@ See `references/re-summarization-bug.md` for full root-cause analysis and reprod
 - Timeout: 120s per call (set in `call_ollama()`)
 - Summarize prompt: ~200-400 tokens in → ~100 tokens out (5-field template)
 - Grade prompt: ~100 tokens in → **~500-2000 tokens out** (qwen3.5 ignores "return ONLY the letter" and outputs full reasoning chains)
-- Real-world performance: each file requires 2 LLM calls (summarize + grade). Budget ~90s per call at normal Ollama load, so total wall-clock ≈ `num_files × 180s`. Observed runs: 11 files in ~18 min (May 2026), 16 files in ~23 min (May 2026), 18 files in ~20-25 min (May 2026 — all graded C/D), 20 files in ~23 min (May 2026 — all graded C/D), 52 calls (18 summarize + 34 grade) in ~13 min (27 May — ~15s/call, much faster than typical). Times vary with Ollama load; budget ~100s per LLM call for conservative planning, but recent performance suggests ~15-40s per call depending on load: 52 calls in ~13 min (~15s/call, 27 May — light load), 76 calls in ~50 min (~40s/call, 27 May cron #3 — moderate load).
+- Real-world performance: each file requires 2 LLM calls (summarize + grade). Budget ~90s per call at normal Ollama load, so total wall-clock ≈ `num_files × 180s`. Observed runs: 11 files in ~18 min (May 2026), 16 files in ~23 min (May 2026), 18 files in ~20-25 min (May 2026 — all graded C/D), 20 files in ~23 min (May 2026 — all graded C/D), 72 calls (18 summarize + 54 grade) in ~27 min (28 May cron #4 — ~22s/call, moderate load), 52 calls (18 summarize + 34 grade) in ~13 min (27 May — ~15s/call, much faster than typical). Times vary with Ollama load; budget ~100s per LLM call for conservative planning, but recent performance suggests ~15-40s per call depending on load: 52 calls in ~13 min (~15s/call, 27 May — light load), 76 calls in ~50 min (~40s/call, 27 May cron #3 — moderate load).
 
 ### ⚠️ Pitfall: IP Address Unreachable from This Node
 
@@ -160,7 +153,7 @@ The grading system prompt says "Output ONLY the letter grade (A, B, C, or D). No
 
 **The pipeline does NOT recover from this.** `call_ollama()` returns the full response (including thinking chain), and `stage_grade()` does `grade in ("A", "B")` — an **exact match**, not a substring search. When the verbose response contains 2000+ characters, it never equals the single-letter strings `"A"` or `"B"`. Result: **all sessions are silently deleted, including those the model internally graded A/B.**
 
-The 1-3 keepers observed in some past runs were sessions where the model happened to output a bare letter — this is luck, not the pipeline working. Zero-keeper runs (like this one: 0/49) are the norm when the model is consistently verbose.
+The 1-3 keepers observed in some past runs (including 3 in the 28 May cron #4 run) were sessions where the model happened to output a bare letter — this is luck, not the pipeline working. Zero-keeper runs are the norm when the model is consistently verbose on every grading call.
 
 This also inflates grade stage time from a theoretical ~1-3s to ~60-120s per file.
 
