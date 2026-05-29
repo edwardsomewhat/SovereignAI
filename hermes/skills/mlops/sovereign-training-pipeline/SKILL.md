@@ -158,6 +158,30 @@ The 1-3 keepers observed in some past runs (including 3 in the 28 May cron #4 ru
 
 This also inflates grade stage time from a theoretical ~1-3s to ~60-120s per file.
 
+### Pitfall: Empty Processed Files from Thinking-Model Response Handling (Summarize Stage)
+
+The `call_ollama()` function has logic for handling thinking models that return separate `response` and `thinking` fields. The original logic was:
+
+```python
+if response and response.strip():
+    return response.strip()
+if thinking and len(thinking.strip()) < 500:
+    return thinking.strip()
+return response.strip()  # ← returns "" when response is empty and thinking > 500 chars
+```
+
+When the Ollama model is a thinking variant (like `qwen3.5:9b`), it often puts the actual answer in the `thinking` field and leaves `response` empty. The chain-of-thought makes `thinking` exceed 500 chars, so the function returns an empty string.
+
+**Effect:** `stage_summarize()` writes empty `processed/{stem}.txt` files. On subsequent runs, `stage_summarize()` checks `processed/{stem}.txt` existence and **skips** the file — the empty file permanently blocks re-processing. The session is never summarized or graded.
+
+**Detection:** Find empty processed files with `find processed/ -name '*.txt' -empty`. Delete them so they can be re-processed.
+
+**Fix applied** (2026-05-29 in `call_ollama()`): When `response` is empty, extract the final answer from `thinking`:
+- Split on `<｜end▁of▁thinking｜>` tags (qwen3.5 wraps CoT in `thinking...thinking` markers) and take the last segment
+- Fallback: split on double-newlines and take the last paragraph if it's >20 chars
+- Fallback: take the last 2000 chars of the thinking field (answer is usually at the end)
+- Final fallback: return the full thinking string
+
 ## Grading Rubric
 
 | Grade | Action | Criteria |
