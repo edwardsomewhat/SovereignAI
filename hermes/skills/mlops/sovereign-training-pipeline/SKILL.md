@@ -57,7 +57,7 @@ ls ~/.hermes/training_data/curated/*.txt | wc -l     # growing = grade stage
 
 File-count monitoring is the **primary** way to track progress — even with `PYTHONUNBUFFERED=1`, small print() output from capture/summarize stages typically does not flush through the process pipe until process exit. Only the verbose LLM grading output (thousands of chars) overflows the OS pipe buffer and appears mid-run. Also check the state file for capture count: `cat ~/.hermes/training_data/pipeline_state.json`.
 
-**⚠️ Pitfall: `process(action="wait")` is clamped to 180s.** Regardless of the timeout value you pass (e.g., 600s or 1800s), the wait action is internally clamped to 180 seconds. You cannot do a single long blocking wait — you must poll in a loop. (Previously documented as 60s; raised to 180s as of late May 2026.) Use file-count checks between wait calls to track progress:
+**⚠️ Pitfall: `process(action="wait")` is clamped to 60s.** Regardless of the timeout value you pass (e.g., 180s or 1800s), the wait action is internally clamped to 60 seconds. You cannot do a single long blocking wait — you must poll in a loop. Use `sleep N` in combination with file-count checks between polls (see the monitoring snippet below). Use file-count checks between wait calls to track progress:
 ```bash
 # Check file counts frequently rather than doing one long wait
 echo "Raw: $(ls raw/*.md | wc -l) | Processed: $(ls processed/*.txt | wc -l) | Curated: $(ls curated/*.txt | wc -l)"
@@ -88,6 +88,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 28 May 2026 (cron) | 178 | 52 | 52 | 3 | 49 |
 | 28 May 2026 (cron #2) | 180 | 19 | 51 | 2 | 49 |
 | 28 May 2026 (cron #4) | 185 | 18 | 54 | 3 | 51 |
+| 29 May 2026 (cron)     | 189 | 42 | 51 | 5 | 46 |
 
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
 
