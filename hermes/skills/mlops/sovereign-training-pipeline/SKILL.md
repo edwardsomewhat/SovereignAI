@@ -91,10 +91,10 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 29 May 2026 (cron)     | 189 | 42 | 51 | 5 | 46 |
 | 29 May 2026 (cron #2) | 193 | 42 | 42 | 2 | 40 |
 | 30 May 2026 (cron)     | 197 | 39 | 39 | 1 | 38 |
-| 30 May 2026 (cron #2) | 199 | 29 | 40¹| ≥0 | ≥12²|
+| 30 May 2026 (cron #2) | 199 | 29 | ≥12¹| — | — |
+| 30 May 2026 (cron #3) | 201 | 39 | 39 | 3 | 36 |
 
-¹ Orphaned processed files from prior interrupted run inflated graded count (11 pre-existing + 29 newly summarized = 40 to grade).
-² Pipeline still running at conversation cutoff — 12 graded (all deleted), 28 remaining. Final results pending.
+¹ Agent interrupted — incomplete run. Processed files from #2 were cleaned up by cron #3, which started from 199 raw / 0 processed / 162 curated.
 
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
 
@@ -125,7 +125,7 @@ See `references/re-summarization-bug.md` for full root-cause analysis and reprod
 - Timeout: 120s per call (set in `call_ollama()`)
 - Summarize prompt: ~200-400 tokens in → ~100 tokens out (5-field template)
 - Grade prompt: ~100 tokens in → **~500-2000 tokens out** (qwen3.5 ignores "return ONLY the letter" and outputs full reasoning chains)
-- Real-world performance: each file requires 2 LLM calls (summarize + grade). Budget ~90s per call at normal Ollama load, so total wall-clock ≈ `num_files × 180s`. Observed runs: 11 files in ~18 min (May 2026), 16 files in ~23 min (May 2026), 18 files in ~20-25 min (May 2026 — all graded C/D), 20 files in ~23 min (May 2026 — all graded C/D), 72 calls (18 summarize + 54 grade) in ~27 min (28 May cron #4 — ~22s/call, moderate load), 52 calls (18 summarize + 34 grade) in ~13 min (27 May — ~15s/call, much faster than typical). Times vary with Ollama load; budget ~100s per LLM call for conservative planning, but recent performance suggests ~15-40s per call depending on load: 52 calls in ~13 min (~15s/call, 27 May — light load), 76 calls in ~50 min (~40s/call, 27 May cron #3 — moderate load).
+- Real-world performance: each file requires 2 LLM calls (summarize + grade). Budget ~90s per call at normal Ollama load, so total wall-clock ≈ `num_files × 180s`. Observed runs: 11 files in ~18 min (May 2026), 16 files in ~23 min (May 2026), 18 files in ~20-25 min (May 2026 — all graded C/D), 20 files in ~23 min (May 2026 — all graded C/D), 72 calls (18 summarize + 54 grade) in ~27 min (28 May cron #4 — ~22s/call, moderate load), 52 calls (18 summarize + 34 grade) in ~13 min (27 May — ~15s/call, much faster than typical). Times vary with Ollama load; budget ~100s per LLM call for conservative planning, but recent performance suggests ~15-40s per call depending on load: 52 calls in ~13 min (~15s/call, 27 May — light load), 76 calls in ~50 min (~40s/call, 27 May cron #3 — moderate load), 78 calls in ~90 min (~69s/call, 30 May cron #3 — heavy load/slow).
 
 ### ⚠️ Pitfall: IP Address Unreachable from This Node
 
