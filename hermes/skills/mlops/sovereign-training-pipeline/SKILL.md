@@ -91,6 +91,10 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 29 May 2026 (cron)     | 189 | 42 | 51 | 5 | 46 |
 | 29 May 2026 (cron #2) | 193 | 42 | 42 | 2 | 40 |
 | 30 May 2026 (cron)     | 197 | 39 | 39 | 1 | 38 |
+| 30 May 2026 (cron #2) | 199 | 29 | 40¹| ≥0 | ≥12²|
+
+¹ Orphaned processed files from prior interrupted run inflated graded count (11 pre-existing + 29 newly summarized = 40 to grade).
+² Pipeline still running at conversation cutoff — 12 graded (all deleted), 28 remaining. Final results pending.
 
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
 
@@ -125,7 +129,9 @@ See `references/re-summarization-bug.md` for full root-cause analysis and reprod
 
 ### ⚠️ Pitfall: IP Address Unreachable from This Node
 
-The hardcoded default LLM endpoint `http://100.84.92.74:11434` is **not reachable** from this node (hangs/times out). Use the Tailscale hostname instead: `http://hq-ai:11434`. Always pass `TRAINING_LLM_URL=http://hq-ai:11434` when running the pipeline:
+The hardcoded default LLM endpoint `http://100.84.92.74:11434` has historically been **not reachable** from this node (hangs/times out). Use the Tailscale hostname instead: `http://hq-ai:11434`. Always pass `TRAINING_LLM_URL=http://hq-ai:11434` when running the pipeline.
+
+**2026-05-30 update:** The default IP did work during a cron run (30 May, second cron), completing 29 summaries without the override. This may indicate the IP became routable (e.g., Tailscale subnet routing change) or was transient. `http://hq-ai:11434` remains the safer, canonical choice — do not rely on the raw IP being reachable.
 
 ```bash
 TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 .../python training_pipeline.py all
