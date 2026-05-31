@@ -97,6 +97,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 31 May 2026 (cron)     | 204 | 39 | 39 | 0 | 39 |
 | 31 May 2026 (cron #2)  | 206 | 15 | 41 | 0 | 41 |
 | 31 May 2026 (cron #3)  | 208 | 43 | 43 | 0 | 43 |
+| 31 May 2026 (cron #4)  | 212 | 47 | 47 | 0 | 47 |
 
 ¹ Agent interrupted — incomplete run. Processed files from #2 were cleaned up by cron #3, which started from 199 raw / 0 processed / 162 curated.
 
