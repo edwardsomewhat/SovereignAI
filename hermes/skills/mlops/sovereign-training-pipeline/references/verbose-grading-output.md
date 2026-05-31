@@ -75,3 +75,6 @@ The 1-2 keepers observed in some runs were sessions where the model happened to 
 | 28 May (cron #2) | 51 | 2 | |
 | 28 May (this run) | 49 | 0 | All 49 deleted. Model verbose on every call. No sessions happened to output bare letters. |
 | 30 May (cron #2)  | 12¹ | 0 | All 12 deleted so far. 28 remaining when conversation cut off.¹ Pipeline ran without TRAINING_LLM_URL override (default IP 100.84.92.74 worked this session — but hq-ai hostname remains the safer choice). |
+| 30 May (cron #3)  | 39 | 3 |  |
+| 30 May (cron #4) | 38 | 0 | All 38 deleted. Model verbose on every call. |
+| 31 May (cron)      | 39 | 0 | All 39 deleted. 2145s total. Keeper drought continues — grade-extraction bug still unpatched. |
