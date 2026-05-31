@@ -93,6 +93,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 30 May 2026 (cron)     | 197 | 39 | 39 | 1 | 38 |
 | 30 May 2026 (cron #2) | 199 | 29 | ≥12¹| — | — |
 | 30 May 2026 (cron #3) | 201 | 39 | 39 | 3 | 36 |
+| 30 May 2026 (cron #4) | 203 | 38 | 38 | 0 | 38 |
 
 ¹ Agent interrupted — incomplete run. Processed files from #2 were cleaned up by cron #3, which started from 199 raw / 0 processed / 162 curated.
 
@@ -157,6 +158,8 @@ print(json.loads(urllib.request.urlopen(req, timeout=30).read()).get('response',
 If it returns within ~30s, the model is loaded and the pipeline will run. Otherwise, let it finish (up to 120s), then re-run the pipeline — the model stays warm for subsequent calls.
 
 ### Pitfall: qwen3.5 Ignores Concise Grading Instructions (Grade-Extraction Bug)
+
+Plus a **timeout bug**: with `num_predict=2048` and a 120s timeout, qwen3.5:9b takes ~142s per call (warm model). All calls time out silently. Fix applied 2026-05-30 in `call_ollama()`: reduced `num_predict` to 512 and increased timeout to 300s. Historical runs (cron #1-#3 on 30 May) all timed out and produced zero results — those were re-run with the fix applied.
 
 The grading system prompt says "Output ONLY the letter grade (A, B, C, or D). No explanation." The qwen3.5:9b model **completely ignores this** and outputs 500-2000 tokens of reasoning before (or instead of) the grade letter.
 
