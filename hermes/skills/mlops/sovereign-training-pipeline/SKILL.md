@@ -57,7 +57,13 @@ ls ~/.hermes/training_data/curated/*.txt | wc -l     # growing = grade stage
 
 File-count monitoring is the **primary** way to track progress — even with `PYTHONUNBUFFERED=1`, small print() output from capture/summarize stages typically does not flush through the process pipe until process exit. Only the verbose LLM grading output (thousands of chars) overflows the OS pipe buffer and appears mid-run. Also check the state file for capture count: `cat ~/.hermes/training_data/pipeline_state.json`.
 
-**⚠️ Pitfall: `process(action="wait")` is clamped to 60s.** Regardless of the timeout value you pass (e.g., 180s or 1800s), the wait action is internally clamped to 60 seconds. You cannot do a single long blocking wait — you must poll in a loop. Use `sleep N` in combination with file-count checks between polls (see the monitoring snippet below). Use file-count checks between wait calls to track progress:
+**⚠️ Pitfall: `process(action="wait")` is clamped to 60s.** Regardless of the timeout value you pass (e.g., 180s or 1800s), the wait action is internally clamped to 60 seconds. You cannot do a single long blocking wait — you must poll in a loop. Use `sleep N` in combination with file-count checks between polls.
+
+**⚠️ Pitfall: Foreground terminal timeout caps monitoring sleeps.** Hermes enforces a 600s maximum foreground terminal timeout. When monitoring with `sleep N && echo ...`, the total `sleep + terminal timeout` must stay under 600s. Keep sleeps at ≤580s to avoid `"Foreground timeout exceeds the maximum of 600s"` rejections. Pattern:
+```bash
+terminal("sleep 300 && echo ...", timeout=310)  # ok: 310 ≤ 600
+terminal("sleep 600 && echo ...", timeout=610)  # REJECTED: 610 > 600
+```
 ```bash
 # Check file counts frequently rather than doing one long wait
 echo "Raw: $(ls raw/*.md | wc -l) | Processed: $(ls processed/*.txt | wc -l) | Curated: $(ls curated/*.txt | wc -l)"
@@ -98,6 +104,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 31 May 2026 (cron #2)  | 206 | 15 | 41 | 0 | 41 |
 | 31 May 2026 (cron #3)  | 208 | 43 | 43 | 0 | 43 |
 | 31 May 2026 (cron #4)  | 212 | 47 | 47 | 0 | 47 |
+| 01 Jun 2026 (cron)     | 216 | 51 | 51 | 0 | 51 |
 
 ¹ Agent interrupted — incomplete run. Processed files from #2 were cleaned up by cron #3, which started from 199 raw / 0 processed / 162 curated.
 
@@ -143,6 +150,22 @@ TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 .../python training_pipel
 ```
 
 Verify connectivity before running: `tailscale ping hq-ai`.
+
+### ⚠️ Pitfall: Ollama Not Running on hq-ai
+
+The Ollama service on hq-ai may be down (e.g., after a reboot). Symptoms: `ConnectionRefusedError: [Errno 111] Connection refused` on any `http://hq-ai:11434` request, even though `tailscale ping hq-ai` succeeds (ping tests network, not the service).
+
+**Check:** `tailscale ssh hq-ai 'systemctl is-active ollama'` — if it returns `inactive`, start it:
+```bash
+tailscale ssh hq-ai 'sudo systemctl start ollama && sleep 2 && systemctl is-active ollama'
+```
+
+After starting, the model still needs a warm-up call (see Cold Model Timeout below).
+
+**Pre-flight checklist** before running the pipeline:
+1. `tailscale ping hq-ai` — network reachable?
+2. `tailscale ssh hq-ai 'systemctl is-active ollama'` — service running? If `inactive`, start it.
+3. Warm-up call (below) — model loaded? If it times out, wait and retry.
 
 ### ⚠️ Pitfall: Cold Model Timeout (first run after Ollama restart)
 
