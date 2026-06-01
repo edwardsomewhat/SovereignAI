@@ -186,13 +186,13 @@
     "created_at": "2026-05-23T16:35:38.412036+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-05-31T22:24:46.822595+00:00",
-    "last_used_at": "2026-05-31T21:49:44.588707+00:00",
-    "last_viewed_at": "2026-05-31T21:49:44.586297+00:00",
+    "last_used_at": "2026-06-01T02:24:33.144309+00:00",
+    "last_viewed_at": "2026-06-01T02:24:33.143355+00:00",
     "patch_count": 72,
     "pinned": false,
     "state": "active",
-    "use_count": 71,
-    "view_count": 71
+    "use_count": 72,
+    "view_count": 72
   },
   "tailscale-mcp": {
     "archived_at": null,
