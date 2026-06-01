@@ -228,4 +228,9 @@ When the Ollama model is a thinking variant (like `qwen3.5:9b`), it often puts t
 | A     | Keep   | User correction + agent adapts. Novel problem solved. Architecture decision. |
 | B     | Keep   | Multi-turn reasoning chain with tool calls that succeeded. Non-trivial workflow. |
 | C     | Discard | Mechanical success. File reads, simple queries. Single tool calls. |
-| D     | Discard | Failures, dead ends, agent spinning with no resolution. |
+| D (discard) | Delete | Failures, dead ends, agent spinning with no resolution. |
+
+## References
+
+- [`references/proxy-capture.md`](references/proxy-capture.md) — Real-time Docker-based intercept proxy architecture.
+- [`references/operations.md`](references/operations.md) — Operational notes: monitoring background runs, timing expectations, stage behavior, and file locations.
