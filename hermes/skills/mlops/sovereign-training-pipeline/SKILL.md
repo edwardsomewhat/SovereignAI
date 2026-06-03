@@ -141,11 +141,11 @@ See `references/re-summarization-bug.md` for full root-cause analysis and reprod
 - Grade prompt: ~100 tokens in → **~500-2000 tokens out** (qwen3.5 ignores "return ONLY the letter" and outputs full reasoning chains)
 - Real-world performance: each file requires 2 LLM calls (summarize + grade). Budget ~90s per call at normal Ollama load, so total wall-clock ≈ `num_files × 180s`. Observed runs: 11 files in ~18 min (May 2026), 16 files in ~23 min (May 2026), 18 files in ~20-25 min (May 2026 — all graded C/D), 20 files in ~23 min (May 2026 — all graded C/D), 72 calls (18 summarize + 54 grade) in ~27 min (28 May cron #4 — ~22s/call, moderate load), 52 calls (18 summarize + 34 grade) in ~13 min (27 May — ~15s/call, much faster than typical). Times vary with Ollama load; budget ~100s per LLM call for conservative planning, but recent performance suggests ~15-40s per call depending on load: 52 calls in ~13 min (~15s/call, 27 May — light load), 76 calls in ~50 min (~40s/call, 27 May cron #3 — moderate load), 78 calls in ~90 min (~69s/call, 30 May cron #3 — heavy load/slow).
 
-### ⚠️ Pitfall: IP Address Unreachable from This Node
+### ⚠️ Pitfall: LLM Endpoint — Prefer Hostname Over Raw IP
 
-The hardcoded default LLM endpoint `http://100.84.92.74:11434` has historically been **not reachable** from this node (hangs/times out). Use the Tailscale hostname instead: `http://hq-ai:11434`. Always pass `TRAINING_LLM_URL=http://hq-ai:11434` when running the pipeline.
+The hardcoded default LLM endpoint `http://100.84.92.74:11434` may or may not be reachable depending on Tailscale subnet routing state. The Tailscale hostname `http://hq-ai:11434` is the canonical, reliable choice.
 
-**2026-05-30 update:** The default IP did work during a cron run (30 May, second cron), completing 29 summaries without the override. This may indicate the IP became routable (e.g., Tailscale subnet routing change) or was transient. `http://hq-ai:11434` remains the safer, canonical choice — do not rely on the raw IP being reachable.
+**Status as of 2026-06-03:** The default IP has been reachable for several consecutive runs (since ~31 May), suggesting it is now reliably routable. However, the hostname remains the safer choice — the raw IP could become unreachable again if Tailscale subnet routing changes.
 
 ```bash
 TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 .../python training_pipeline.py all
@@ -198,29 +198,36 @@ The 1-3 keepers observed in some past runs (including 3 in the 28 May cron #4 ru
 
 This also inflates grade stage time from a theoretical ~1-3s to ~60-120s per file.
 
-### Pitfall: Empty Processed Files from Thinking-Model Response Handling (Summarize Stage)
+### Pitfall: Thinking-Model Output Problems in Summarize Stage
 
-The `call_ollama()` function has logic for handling thinking models that return separate `response` and `thinking` fields. The original logic was:
+The `call_ollama()` function handles thinking models that return separate `response` and `thinking` fields. Two failure modes exist:
 
-```python
-if response and response.strip():
-    return response.strip()
-if thinking and len(thinking.strip()) < 500:
-    return thinking.strip()
-return response.strip()  # ← returns "" when response is empty and thinking > 500 chars
+**Mode 1 — Empty files (fixed):** The original logic returned `""` when `response` was empty and `thinking` > 500 chars. Fixed 2026-05-29 with fallback extraction from `thinking` field. Empty files blocking re-processing are a solved problem.
+
+**Mode 2 — Garbage thinking traces (unresolved):** The thinking-field fallback extraction often captures raw CoT reasoning instead of the structured 5-field template. The LLM internally thinks about how to summarize but never outputs the structured result, and the fallback logic saves the reasoning chain as the "summary."
+
+**Observed (2026-06-03):** 26 of 47 processed files (55%) were raw thinking traces like:
+
+```
+1.  **ANALYZE THE REQUEST:**
+    *   ROLE: TRAINING DATA CURATOR...
+    *   TASK: READ THE PROVIDED AGENT SESSION TRANSCRIPT...
 ```
 
-When the Ollama model is a thinking variant (like `qwen3.5:9b`), it often puts the actual answer in the `thinking` field and leaves `response` empty. The chain-of-thought makes `thinking` exceed 500 chars, so the function returns an empty string.
+instead of the expected structured template starting with `INTERACTION:`.
 
-**Effect:** `stage_summarize()` writes empty `processed/{stem}.txt` files. On subsequent runs, `stage_summarize()` checks `processed/{stem}.txt` existence and **skips** the file — the empty file permanently blocks re-processing. The session is never summarized or graded.
+**Detection:** Garbage summaries don't start with `INTERACTION:`. Check with:
+```bash
+cd ~/.hermes/training_data/processed
+for f in *.txt; do head -c 13 "$f" | grep -q "^INTERACTION:" || echo "GARBAGE: $f"; done
+```
 
-**Detection:** Find empty processed files with `find processed/ -name '*.txt' -empty`. Delete them so they can be re-processed.
+**Remediation:** Delete garbage files so the summarizer can re-process on the next run (though same raw session may produce another garbage summary — root cause is in `call_ollama()` extraction logic):
+```bash
+for f in processed/*.txt; do head -c 13 "$f" | grep -q "^INTERACTION:" || rm "$f"; done
+```
 
-**Fix applied** (2026-05-29 in `call_ollama()`): When `response` is empty, extract the final answer from `thinking`:
-- Split on `<｜end▁of▁thinking｜>` tags (qwen3.5 wraps CoT in `thinking...thinking` markers) and take the last segment
-- Fallback: split on double-newlines and take the last paragraph if it's >20 chars
-- Fallback: take the last 2000 chars of the thinking field (answer is usually at the end)
-- Final fallback: return the full thinking string
+**Workaround — batch grading with non-thinking model:** When grading is needed and the pipeline's qwen3.5:9b is too slow or produces unparseable output, switch to batch grading with `hermes3:8b` (non-thinking, 4.7 GB). Group 5-10 summaries per batch, ask for `FILENAME:GRADE` output. See [`references/garbage-summaries-and-batch-grading.md`](references/garbage-summaries-and-batch-grading.md) for the full pattern.
 
 ## Grading Rubric
 
@@ -235,3 +242,4 @@ When the Ollama model is a thinking variant (like `qwen3.5:9b`), it often puts t
 
 - [`references/proxy-capture.md`](references/proxy-capture.md) — Real-time Docker-based intercept proxy architecture.
 - [`references/operations.md`](references/operations.md) — Operational notes: monitoring background runs, timing expectations, stage behavior, and file locations.
+- [`references/garbage-summaries-and-batch-grading.md`](references/garbage-summaries-and-batch-grading.md) — Detecting thinking-trace garbage from summarizer, and batch-grading with non-thinking models (hermes3:8b) as a faster workaround.
