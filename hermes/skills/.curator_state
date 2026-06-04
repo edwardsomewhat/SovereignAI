@@ -1,9 +1,9 @@
 {
   "last_report_path": "/home/fated/.hermes/logs/curator/20260528-224846",
-  "last_run_at": "2026-05-28T22:48:46.632305+00:00",
+  "last_run_at": "2026-06-04T23:24:00.353951+00:00",
   "last_run_duration_seconds": 298.868324,
-  "last_run_summary": "auto: no changes; llm: ## Consolidation Pass Summary\n\n**12 agent-created skills → 8**, with 5 archived across 3 clusters. One net-new umbrella created.\n\n### Clusters processed\n\n**1. TTS/Voice Cloning (3→1)** — `qwen3-tts`, `qwen3-tts-voice-cloning`, and `tts-voic…\narchived 5 skill(s):\n  • qwen3-tts → qwen3-tts-voice-cloning\n  • training-data-capture → sovereign-training-pipeline\n  • tts-voice-cloning → qwen3-tts-voice-cloning\n  • headless-linux-audio — pruned (stale)\n  • uvc-ptz-camera — pruned (stale)\nfull report: hermes curator status\nkeep an umbrella stable: hermes curator pin qwen3-tts-voice-cloning",
+  "last_run_summary": "auto: no changes",
   "last_run_summary_shown_at": "2026-05-14T15:27:33.776823+00:00",
   "paused": false,
-  "run_count": 5
+  "run_count": 6
 }
