@@ -25,6 +25,19 @@
     "use_count": 3,
     "view_count": 3
   },
+  "devops/tailscale-mcp": {
+    "archived_at": null,
+    "created_at": "2026-06-04T23:25:44.548006+00:00",
+    "created_by": null,
+    "last_patched_at": null,
+    "last_used_at": "2026-06-04T23:25:44.549009+00:00",
+    "last_viewed_at": "2026-06-04T23:25:44.548021+00:00",
+    "patch_count": 0,
+    "pinned": false,
+    "state": "active",
+    "use_count": 1,
+    "view_count": 1
+  },
   "firecrawl": {
     "archived_at": null,
     "created_at": "2026-05-15T21:08:33.476542+00:00",
@@ -120,14 +133,14 @@
     "archived_at": null,
     "created_at": "2026-05-18T14:16:18.350158+00:00",
     "created_by": "agent",
-    "last_patched_at": "2026-05-18T17:14:36.035863+00:00",
-    "last_used_at": "2026-06-04T23:24:12.713377+00:00",
-    "last_viewed_at": "2026-06-04T23:24:12.701753+00:00",
-    "patch_count": 3,
+    "last_patched_at": "2026-06-04T23:26:27.541711+00:00",
+    "last_used_at": "2026-06-04T23:26:55.760320+00:00",
+    "last_viewed_at": "2026-06-04T23:26:55.759120+00:00",
+    "patch_count": 7,
     "pinned": false,
     "state": "active",
-    "use_count": 6,
-    "view_count": 6
+    "use_count": 8,
+    "view_count": 8
   },
   "qwen3-tts-voice-clone": {
     "archived_at": null,
@@ -185,27 +198,14 @@
     "archived_at": null,
     "created_at": "2026-05-23T16:35:38.412036+00:00",
     "created_by": "agent",
-    "last_patched_at": "2026-06-03T17:24:00.332556+00:00",
-    "last_used_at": "2026-06-04T23:24:12.704543+00:00",
-    "last_viewed_at": "2026-06-04T23:24:12.692571+00:00",
-    "patch_count": 87,
+    "last_patched_at": "2026-06-05T00:20:07.430183+00:00",
+    "last_used_at": "2026-06-05T00:19:45.714832+00:00",
+    "last_viewed_at": "2026-06-05T00:19:45.711665+00:00",
+    "patch_count": 88,
     "pinned": false,
     "state": "active",
-    "use_count": 86,
-    "view_count": 86
-  },
-  "tailscale-mcp": {
-    "archived_at": null,
-    "created_at": "2026-05-19T16:30:23.019686+00:00",
-    "created_by": "agent",
-    "last_patched_at": "2026-05-19T21:06:41.286005+00:00",
-    "last_used_at": "2026-06-04T23:24:18.015858+00:00",
-    "last_viewed_at": "2026-06-04T23:24:18.012924+00:00",
-    "patch_count": 2,
-    "pinned": false,
-    "state": "active",
-    "use_count": 5,
-    "view_count": 5
+    "use_count": 88,
+    "view_count": 88
   },
   "web-search/kiwix": {
     "archived_at": null,

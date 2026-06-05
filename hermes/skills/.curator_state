@@ -1,8 +1,8 @@
 {
-  "last_report_path": "/home/fated/.hermes/logs/curator/20260528-224846",
+  "last_report_path": "/home/fated/.hermes/logs/curator/20260604-232400",
   "last_run_at": "2026-06-04T23:24:00.353951+00:00",
-  "last_run_duration_seconds": 298.868324,
-  "last_run_summary": "auto: no changes",
+  "last_run_duration_seconds": 217.306155,
+  "last_run_summary": "auto: no changes; llm: `tailscale-mcp` is confirmed gone from the active devops category. The consolidation is clean.\n\nNow let me produce the final summary.\n\n---\n\n## Human Summary\n\n**Pass complete.** Scanned all 7 agent-created skills across 3 categories (devops,…\narchived 1 skill(s):\n  • tailscale-mcp → network-file-access\nfull report: hermes curator status\nkeep an umbrella stable: hermes curator pin network-file-access",
   "last_run_summary_shown_at": "2026-05-14T15:27:33.776823+00:00",
   "paused": false,
   "run_count": 6

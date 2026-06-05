@@ -1,12 +1,12 @@
 ---
 name: network-file-access
-description: "Access files on remote machines in the local network or Tailscale tailnet — Windows (SMB), Linux (SSH/SFTP), and file shares. Use when the user provides a remote machine IP/hostname/password or file path on another machine."
+description: "Access files on remote machines in the local network or Tailscale tailnet — Windows (SMB), Linux (SSH/SFTP), file shares, and Tailscale MCP server setup. Use when the user provides a remote machine IP/hostname/password or file path on another machine."
 version: 1.1.0
 author: Hermes Agent
 license: MIT
 metadata:
   hermes:
-    tags: [networking, file-transfer, SMB, SSH, tailscale, Windows-access, remote-files, taildrop, tailscale-api]
+    tags: [networking, file-transfer, SMB, SSH, tailscale, Windows-access, remote-files, taildrop, tailscale-api, mcp]
     related_skills: [github-auth, obsidian]
 ---
 
@@ -233,6 +233,61 @@ tailscale file get ~/Downloads/
 
 Without operator permissions, `tailscale file get` returns "Access denied." The fix is the `--operator` command above.
 
+## Method 4: Tailscale MCP Server
+
+For programmatic tailnet management from within Hermes Agent conversations, you can install an MCP server that wraps the Tailscale CLI and local API into 8 discoverable tools. Once registered, the agent gains `mcp_tailscale_*` tools for status, SSH, file transfer, ping, and REST API access — no more raw `tailscale` CLI calls needed.
+
+### Quick Setup
+
+```bash
+# 1. Ensure Python MCP SDK is installed in Hermes venv
+~/.hermes/hermes-agent/venv/bin/python -m ensurepip
+~/.hermes/hermes-agent/venv/bin/pip3 install mcp
+
+# 2. Create the MCP server directory and copy server.py
+mkdir -p ~/.hermes/mcp-servers/tailscale-mcp
+# Copy scripts/server.py from this skill's scripts/ directory
+cp ~/.hermes/skills/devops/network-file-access/scripts/server.py ~/.hermes/mcp-servers/tailscale-mcp/server.py
+
+# 3. Register with Hermes
+echo "y" | hermes mcp add tailscale \
+  --command ~/.hermes/hermes-agent/venv/bin/python \
+  --args ~/.hermes/mcp-servers/tailscale-mcp/server.py
+
+# 4. Start a new session (/reset) to use the tools
+```
+
+### Tools Provided
+
+| Tool | Description |
+|------|-------------|
+| `tailscale_status` | Full tailnet map (online/offline, IPs, OS, users) |
+| `tailscale_node` | Detailed info on a specific node by hostname or IP |
+| `tailscale_ping` | Connectivity check and latency test |
+| `tailscale_ssh` | Run commands on any tailnet node (Tailscale SSH) |
+| `tailscale_file_send` | Push files to any node via Taildrop |
+| `tailscale_file_receive` | List or download incoming Taildrop files |
+| `tailscale_manage` | Status, netcheck, whois, version, IP |
+| `tailscale_api` | Call official Tailscale REST API (needs TS_API_KEY) |
+
+### Requirements
+
+- Tailscale installed and authenticated on the node
+- `python-mcp` package in Hermes venv
+- `curl` for local API queries
+- Taildrop: `sudo tailscale set --operator=$USER` for file operations without sudo
+- REST API: `TAILSCALE_API_KEY` or `TS_API_KEY` env var in `~/.hermes/.env`
+
+### Verification
+
+```bash
+# Check MCP server is registered
+hermes mcp list
+# Should show 'tailscale' with 8 tools enabled
+```
+
+The server script is at `scripts/server.py` in this skill's directory. It wraps the same Tailscale CLI and local daemon API covered in Method 3 above into structured MCP tools.
+
 ## Using Credentials
 
 - The user may provide passwords in freeform text. Multiple options may be given; try them in order
@@ -248,6 +303,7 @@ Without operator permissions, `tailscale file get` returns "Access denied." The 
 4. **Editing a fine-grained GitHub PAT regenerates the token.** If you get 401 / Bad credentials after the user said they edited permissions, ask for the new token value
 5. **smbprotocol installed to user site-packages is not visible in execute_code sandbox.** Write SMB scripts to files and run them via `python3 /path/to/script.py` instead
 6. **Tailscale local API requires Unix socket access.** The `execute_code` sandbox cannot access Unix sockets directly. Use `terminal()` to run curl and parse the JSON output separately
+7. **Tailscale SSH host key verification failure.** `tailscale ssh <host>` can fail with "No ED25519 host key is known" if the FQDN resolves via Tailscale DNS but the SSH daemon only binds to the raw IP. Fallback: `sshpass -p '<password>' ssh -o StrictHostKeyChecking=accept-new <user>@<tailscale-ip> "<command>"` using the raw Tailscale IPv4 (e.g., `100.84.226.78`) instead of the FQDN
 
 ## Verification Checklist
 
