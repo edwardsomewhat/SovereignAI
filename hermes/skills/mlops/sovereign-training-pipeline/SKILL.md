@@ -129,6 +129,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 03 Jun 2026 (cron #2)  | 231 | 58 | 58 | 0 | 58 |
 | 03 Jun 2026 (cron #3)  | 233 | 60 | 60 | 0 | 60 |
 | 04 Jun 2026 (cron)     | 236 | 63 | 63 | 4 | 59 |
+| 05 Jun 2026 (cron)     | 240 | 25 | 63 | 10 | 53 |
 
 The curated-path skip
 
