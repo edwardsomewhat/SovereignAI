@@ -131,6 +131,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 04 Jun 2026 (cron)     | 236 | 63 | 63 | 4 | 59 |
 | 05 Jun 2026 (cron)     | 240 | 25 | 63 | 10 | 53 |
 | 05 Jun 2026 (cron #3) | 242 | 31 | 55 | 9  | 46 |
+| 05 Jun 2026 (cron #4)  | 244 | 24 | 48 | 4  | 44 |
 
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions**
 
