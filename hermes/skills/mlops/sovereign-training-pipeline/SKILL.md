@@ -130,8 +130,9 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 03 Jun 2026 (cron #3)  | 233 | 60 | 60 | 0 | 60 |
 | 04 Jun 2026 (cron)     | 236 | 63 | 63 | 4 | 59 |
 | 05 Jun 2026 (cron)     | 240 | 25 | 63 | 10 | 53 |
+| 05 Jun 2026 (cron #3) | 242 | 31 | 55 | 9  | 46 |
 
-The curated-path skip
+The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions**
 
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
 
