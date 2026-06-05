@@ -80,3 +80,4 @@ The 1-2 keepers observed in some runs were sessions where the model happened to 
 | 31 May (cron)      | 39 | 0 | All 39 deleted. 2145s total. Keeper drought continues — grade-extraction bug still unpatched. |
 | 31 May (cron #2)   | 41 | 0 | All 41 deleted. ~18 min runtime. Default IP reachable again (no override needed). |
 | 03 Jun (cron)       | 57¹| 8 | 26 were garbage thinking traces (auto-deleted). 21 proper templates batch-graded with hermes3:8b — 8 kept, 13 deleted. Keeper rate on proper summaries: 38%. Total curated: 173. |
+| 05 Jun (cron)       | 61 | 0 | All 61 deleted. 48 summarized + 13 orphaned from prior run. ~99 min runtime. Model verbose on every call. Log-file redirect (`> /tmp/pipeline_out.txt 2>&1`) successfully captured all output for monitoring.

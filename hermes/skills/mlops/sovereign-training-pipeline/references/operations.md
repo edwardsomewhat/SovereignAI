@@ -2,17 +2,30 @@
 
 ## Monitoring background runs
 
-When running `training_pipeline.py all` in background mode (terminal `background=true`), Python's stdout is fully buffered when piped — **no output is visible until the process exits**. Do not wait for stdout to appear.
+When running `training_pipeline.py all` in background mode, two monitoring strategies are available:
 
-**Monitor progress by checking file counts in the processed/ directory:**
+### Log-file redirect (preferred for real-time visibility)
+
+Redirect stdout to a file — all output is written immediately and can be read in real time:
 
 ```bash
-ls ~/.hermes/training_data/processed/*.txt | wc -l
+.../python training_pipeline.py all > /tmp/pipeline_out.txt 2>&1
 ```
 
-Or via `search_files`:
+Then from another terminal:
+```bash
+cat /tmp/pipeline_out.txt          # see all progress
+tail -3 /tmp/pipeline_out.txt       # see latest session being processed
+grep 'Summarized\|Graded' /tmp/pipeline_out.txt  # extract summary lines
 ```
-search_files(path="~/.hermes/training_data/processed", pattern="*.txt", target="files")
+
+This captures capture, summarize, AND grade stage output — including the small print() calls that don't flush through the Hermes process pipe.
+
+### File-count monitoring (lightweight, no log file needed)
+
+```bash
+ls ~/.hermes/training_data/processed/*.txt | wc -l   # growing = summarize stage
+ls ~/.hermes/training_data/curated/*.txt | wc -l     # growing = grade stage
 ```
 
 ## Timing

@@ -55,7 +55,25 @@ ls ~/.hermes/training_data/processed/*.txt | wc -l   # growing = summarize stage
 ls ~/.hermes/training_data/curated/*.txt | wc -l     # growing = grade stage
 ```
 
-File-count monitoring is the **primary** way to track progress — even with `PYTHONUNBUFFERED=1`, small print() output from capture/summarize stages typically does not flush through the process pipe until process exit. Only the verbose LLM grading output (thousands of chars) overflows the OS pipe buffer and appears mid-run. Also check the state file for capture count: `cat ~/.hermes/training_data/pipeline_state.json`.
+File-count monitoring is one way to track progress — `PYTHONUNBUFFERED=1` doesn't help with Hermes process pipe buffering for small print() calls. However, **redirecting stdout to a file** (`> /tmp/pipeline_out.txt 2>&1`) captures ALL output immediately, including capture and summarize stage progress lines. Read the log file with `cat /tmp/pipeline_out.txt` or `tail -3 /tmp/pipeline_out.txt` to see which session is being processed right now — much more informative than directory counts alone.
+
+**Monitoring options (prefer the log file when you need real-time visibility):**
+
+```bash
+# Option A: Log-file redirect (best for real-time progress)
+.../python training_pipeline.py all > /tmp/pipeline_out.txt 2>&1
+
+# Then from another terminal call:
+cat /tmp/pipeline_out.txt
+tail -3 /tmp/pipeline_out.txt
+
+# Option B: File-count monitoring (lightweight, works without file redirect)
+ls ~/.hermes/training_data/processed/*.txt | wc -l   # growing = summarize stage
+ls ~/.hermes/training_data/curated/*.txt | wc -l     # growing = grade stage
+
+# Option C: State file (capture stage only)
+cat ~/.hermes/training_data/pipeline_state.json
+```
 
 **⚠️ Pitfall: `process(action="wait")` is clamped to 60s.** Regardless of the timeout value you pass (e.g., 180s or 1800s), the wait action is internally clamped to 60 seconds. You cannot do a single long blocking wait — you must poll in a loop. Use `sleep N` in combination with file-count checks between polls.
 
