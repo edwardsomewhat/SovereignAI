@@ -78,6 +78,8 @@ cat ~/.hermes/training_data/pipeline_state.json
 **⚠️ Pitfall: `process(action="wait")` is clamped to 60s.** Regardless of the timeout value you pass (e.g., 180s or 1800s), the wait action is internally clamped to 60 seconds. You cannot do a single long blocking wait — you must poll in a loop. Use `sleep N` in combination with file-count checks between polls.
 
 **⚠️ Pitfall: Foreground terminal timeout caps monitoring sleeps.** Hermes enforces a 600s maximum foreground terminal timeout. When monitoring with `sleep N && echo ...`, the total `sleep + terminal timeout` must stay under 600s. Keep sleeps at ≤580s to avoid `"Foreground timeout exceeds the maximum of 600s"` rejections. Pattern:
+
+**⚠️ Pitfall: Grade stage can time out mid-run with verbose LLM output.** qwen3.5:9b's verbose grading responses (500-2000+ chars of reasoning per file) mean that grading even ~30 files can exceed the 600s foreground terminal timeout. When this happens, processed files that weren't reached remain in `processed/`. Recovery: just run `grade` again — it picks up the remaining files. The `grade` stage is idempotent and safe to re-run. On subsequent runs, check `ls processed/*.txt | wc -l` to see if any files were left behind.
 ```bash
 terminal("sleep 300 && echo ...", timeout=310)  # ok: 310 ≤ 600
 terminal("sleep 600 && echo ...", timeout=610)  # REJECTED: 610 > 600
@@ -132,6 +134,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 05 Jun 2026 (cron)     | 240 | 25 | 63 | 10 | 53 |
 | 05 Jun 2026 (cron #3) | 242 | 31 | 55 | 9  | 46 |
 | 05 Jun 2026 (cron #4)  | 244 | 24 | 48 | 4  | 44 |
+| 06 Jun 2026 (cron)     | 247 | 15 | 49 | 8  | 41 |
 
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions**
 
