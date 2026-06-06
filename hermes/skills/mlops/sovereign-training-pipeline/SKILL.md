@@ -138,6 +138,7 @@ The curated-path skip
 | 06 Jun 2026 (cron)     | 247 | 15 | 49 | 8  | 41 |
 | 06 Jun 2026 (cron #2)  | 249 | 7  | 40 | 3  | 37 |
 | 06 Jun 2026 (cron #3)  | 251 | 12 | 39 | 10 | 29 |
+| 06 Jun 2026 (cron #4)  | 253 | 4  | 31 | 3  | 28 |
 The curated-path skip
 | 06 Jun 2026 (cron #2)  | 249 | 7  | 40 | 3  | 37 |
 The curated-path skip
