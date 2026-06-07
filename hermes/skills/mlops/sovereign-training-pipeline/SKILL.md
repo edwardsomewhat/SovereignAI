@@ -141,6 +141,7 @@ The curated-path skip
 | 06 Jun 2026 (cron #4)  | 253 | 4  | 31 | 3  | 28 |
 | 06 Jun 2026 (cron #5)  | 255 | 3  | 30 | 3  | 27 |
 | 07 Jun 2026 (cron)     | 263 | 9  | 28¹| 1  | 27 |
+| 07 Jun 2026 (cron #2)  | 265 | 27 | 27 | 3  | 24 |
 The curated-path skip
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run.
 The curated-path skip
