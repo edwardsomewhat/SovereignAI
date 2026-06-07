@@ -36,7 +36,7 @@ cd /home/fated
 ./.hermes/hermes-agent/venv/bin/python training_pipeline.py all
 ```
 
-**⚠️ Always run in background mode.** The pipeline makes one LLM call per session (Ollama at `http://hq-ai:11434`, model `qwen3.5:9b`). The default `http://100.84.92.74:11434` is unreachable from this node — always override with `TRAINING_LLM_URL=http://hq-ai:11434`. With 100+ sessions, foreground mode will time out at 600s. Use:
+**⚠️ Always run in background mode.** The pipeline makes one LLM call per session (Ollama at `http://hq-ai:11434`, model `qwen3.5:9b`). The default `http://100.84.92.74:11434` is the same machine — it has been consistently reachable since ~31 May 2026, so omitting `TRAINING_LLM_URL` now works. Still, the hostname `hq-ai` is canonical and safer (avoids Tailscale subnet-routing dependency). With 100+ sessions, foreground mode will time out at 600s. Use:
 
 ```bash
 TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 ./.hermes/hermes-agent/venv/bin/python training_pipeline.py all
@@ -79,7 +79,7 @@ cat ~/.hermes/training_data/pipeline_state.json
 
 **⚠️ Pitfall: Foreground terminal timeout caps monitoring sleeps.** Hermes enforces a 600s maximum foreground terminal timeout. When monitoring with `sleep N && echo ...`, the total `sleep + terminal timeout` must stay under 600s. Keep sleeps at ≤580s to avoid `"Foreground timeout exceeds the maximum of 600s"` rejections. Pattern:
 
-**⚠️ Pitfall: Grade stage can time out mid-run with verbose LLM output.** qwen3.5:9b's verbose grading responses (500-2000+ chars of reasoning per file) mean that grading even ~30 files can exceed the 600s foreground terminal timeout. When this happens, processed files that weren't reached remain in `processed/`. Recovery: just run `grade` again — it picks up the remaining files. The `grade` stage is idempotent and safe to re-run. On subsequent runs, check `ls processed/*.txt | wc -l` to see if any files were left behind.
+**⚠️ Pitfall: Grade stage can time out mid-run with verbose LLM output.** qwen3.5:9b's verbose grading responses (500-2000+ chars of reasoning per file) mean that grading even ~30 files can exceed the 600s foreground terminal timeout. When this happens, processed files that weren't reached remain in `processed/`. **1-3 leftover files is the norm — not a failure.** Recovery: just run `grade` again — it picks up the remaining files. The `grade` stage is idempotent and safe to re-run. On subsequent runs, check `ls processed/*.txt | wc -l` to see if any files were left behind.
 ```bash
 terminal("sleep 300 && echo ...", timeout=310)  # ok: 310 ≤ 600
 terminal("sleep 600 && echo ...", timeout=610)  # REJECTED: 610 > 600
@@ -140,8 +140,9 @@ The curated-path skip
 | 06 Jun 2026 (cron #3)  | 251 | 12 | 39 | 10 | 29 |
 | 06 Jun 2026 (cron #4)  | 253 | 4  | 31 | 3  | 28 |
 | 06 Jun 2026 (cron #5)  | 255 | 3  | 30 | 3  | 27 |
+| 07 Jun 2026 (cron)     | 263 | 9  | 28¹| 1  | 27 |
 The curated-path skip
-| 06 Jun 2026 (cron #2)  | 249 | 7  | 40 | 3  | 37 |
+The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run.
 The curated-path skip
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions**
 
