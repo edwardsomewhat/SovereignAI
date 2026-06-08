@@ -80,6 +80,8 @@ cat ~/.hermes/training_data/pipeline_state.json
 **⚠️ Pitfall: Foreground terminal timeout caps monitoring sleeps.** Hermes enforces a 600s maximum foreground terminal timeout. When monitoring with `sleep N && echo ...`, the total `sleep + terminal timeout` must stay under 600s. Keep sleeps at ≤580s to avoid `"Foreground timeout exceeds the maximum of 600s"` rejections. Pattern:
 
 **⚠️ Pitfall: Grade stage can time out mid-run with verbose LLM output.** qwen3.5:9b's verbose grading responses (500-2000+ chars of reasoning per file) mean that grading even ~30 files can exceed the 600s foreground terminal timeout. When this happens, processed files that weren't reached remain in `processed/`. **1-3 leftover files is the norm — not a failure.** Recovery: just run `grade` again — it picks up the remaining files. The `grade` stage is idempotent and safe to re-run. On subsequent runs, check `ls processed/*.txt | wc -l` to see if any files were left behind.
+
+**⚠️ Pitfall: Grading LLM calls can hang indefinitely (no timeout, no error).** This is distinct from the 120s/300s timeout case — the call never returns an error and the process sits in `do_wait` (sleeping on I/O) forever. The process log stops growing (same line count after multiple polls). Detection: poll log line count twice 30s apart — if unchanged and process is in `S` state (`ps -o state -p <pid>`), the grading call is hung. Recovery: `process(action="kill")`, then re-run only the `grade` stage. The summarized files are already in `processed/` and will be graded on the retry. Example from 08 Jun 2026: pipeline hung for 7+ minutes on the final grading call; killed and 2 of ~17 graded files made it to curated.
 ```bash
 terminal("sleep 300 && echo ...", timeout=310)  # ok: 310 ≤ 600
 terminal("sleep 600 && echo ...", timeout=610)  # REJECTED: 610 > 600
@@ -142,6 +144,10 @@ The curated-path skip
 | 06 Jun 2026 (cron #5)  | 255 | 3  | 30 | 3  | 27 |
 | 07 Jun 2026 (cron)     | 263 | 9  | 28¹| 1  | 27 |
 | 07 Jun 2026 (cron #2)  | 265 | 27 | 27 | 3  | 24 |
+| 08 Jun 2026 (cron)²    | 267 | 4  | ~17| 2  | 15+|
+
+¹ Interrupted: grading killed mid-run after 7 min. Recovered by re-running `grade` stage.
+² Killed: grading hung on final LLM call (DeepSeek API in `do_wait`, no timeout). Killed after ~8 min. Two files made it to curated; ungraded file left in `processed/`.
 The curated-path skip
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run.
 The curated-path skip
