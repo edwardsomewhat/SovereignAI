@@ -127,16 +127,9 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 31 May 2026 (cron #3)  | 208 | 43 | 43 | 0 | 43 |
 | 31 May 2026 (cron #4)  | 212 | 47 | 47 | 0 | 47 |
 | 06 Jun 2026 (cron)     | 247 | 15 | 49 | 8  | 41 |
-| 06 Jun 2026 (cron #2)  | 249 | 7  | 40 | 3  | 37 |
-The curated-path skip
-| 06 Jun 2026 (cron)     | 247 | 15 | 49 | 8  | 41 |
-| 06 Jun 2026 (cron #2)  | 249 | 7  | 40 | 3  | 37 |
-The curated-path skip
-| 03 Jun 2026 (cron #2)  | 231 | 58 | 58 | 0 | 58 |
-| 03 Jun 2026 (cron #3)  | 233 | 60 | 60 | 0 | 60 |
 | 04 Jun 2026 (cron)     | 236 | 63 | 63 | 4 | 59 |
 | 05 Jun 2026 (cron)     | 240 | 25 | 63 | 10 | 53 |
-| 05 Jun 2026 (cron #3) | 242 | 31 | 55 | 9  | 46 |
+| 05 Jun 2026 (cron #2)  | 242 | 31 | 55 | 9  | 46 |
 | 06 Jun 2026 (cron)     | 247 | 15 | 49 | 8  | 41 |
 | 06 Jun 2026 (cron #2)  | 249 | 7  | 40 | 3  | 37 |
 | 06 Jun 2026 (cron #3)  | 251 | 12 | 39 | 10 | 29 |
@@ -145,13 +138,11 @@ The curated-path skip
 | 07 Jun 2026 (cron)     | 263 | 9  | 28¹| 1  | 27 |
 | 07 Jun 2026 (cron #2)  | 265 | 27 | 27 | 3  | 24 |
 | 08 Jun 2026 (cron)²    | 267 | 4  | ~17| 2  | 15+|
+| 08 Jun 2026 (cron #2)³ | 269 | 1  | 24 | 0  | 24 |
 
 ¹ Interrupted: grading killed mid-run after 7 min. Recovered by re-running `grade` stage.
 ² Killed: grading hung on final LLM call (DeepSeek API in `do_wait`, no timeout). Killed after ~8 min. Two files made it to curated; ungraded file left in `processed/`.
-The curated-path skip
-The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run.
-The curated-path skip
-The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions**
+³ Clean run: 1 new session summarized, 24 graded (1 new + 23 orphaned from prior interrupted runs). All 24 deleted — qwen3.5 verbose on every call. Grade-extraction bug unpatched; 0-keeper runs are the norm. Default IP (100.84.92.74) worked without override.
 
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
 
