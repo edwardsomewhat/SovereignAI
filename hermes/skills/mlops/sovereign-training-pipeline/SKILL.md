@@ -145,6 +145,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 09 Jun 2026 (cron #2)⁷  | 278 | 11 | 22 | 0  | 22 |
 | 09 Jun 2026 (cron #3)⁸  | 280 | 4  | 24 | 5  | 19 |
 | 09 Jun 2026 (cron #4)⁹  | 281 | 8  | 21 | 1  | 20 |
+| 09 Jun 2026 (cron #5)¹⁰  | 284 | 2  | 14 | 0  | 14 |
 
 ¹ Interrupted: grading killed mid-run after 7 min. Recovered by re-running `grade` stage.
 ² Killed: grading hung on final LLM call (DeepSeek API in `do_wait`, no timeout). Killed after ~8 min. Two files made it to curated; ungraded file left in `processed/`.
@@ -155,6 +156,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 ⁷ Clean run, no hangs. 1 captured, 11 summarized, 22 graded (0 kept, 22 deleted). Default IP used without override — 7 consecutive runs now with working default IP. 11 of 22 graded files were orphaned from prior interrupted runs. All deletions attributed to grade-extraction bug (verbose qwen3.5 output).
 ⁸ First run timed out in foreground at 600s — expected. Re-ran stages individually: capture (1 new from timed-out run), summarize (4 files), grade (24 files → 5 kept, 19 deleted). 19 of 24 graded files were orphaned from prior interrupted runs. 5 keepers is above-average; qwen3.5 was less verbose on these calls. Hermes security scanner blocks raw IP addresses in shell commands (`curl http://100.84.92.74:...`), reinforcing the hostname preference.
 ⁹ Clean run via background mode. First attempt timed out at 600s foreground (expected); background retry with `notify_on_complete=true` completed in ~11 min. 1 captured, 8 summarized, 21 graded (1 kept, 20 deleted). 13 of 21 graded files were orphaned from prior interrupted runs. Faster than typical (~31s per LLM call) suggesting light Ollama load.
+¹⁰ First `all` attempt timed out at 600s foreground. Re-ran stages individually: capture (0 new — state already caught up), summarize (2 files), grade (14 files → 0 kept, 14 deleted). 12 of 14 graded were orphaned from prior interrupted runs. Model output included "THIS FEELS LIKE B TO ME...", "THIS APPEARS TO BE AN EXAMPLE WHERE THERE WAS A PROBLEM THAT NEEDED SOLVING THROUGH ARCHITECTURAL ADAPTATION... WHICH COULD MAKE IT A OR B", and multi-paragraph reasoning chains — all failed exact-match. The `process(action="wait")` 60s clamp prevented monitoring the grade stage; had to run it directly with `terminal(timeout=600)`. Hermes security scanner blocked diagnostic `curl` to raw IP, confirming hostname-only policy. LLM endpoint confirmed healthy (qwen3.5 responds in ~11-19s via `urllib.request`).
 
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
 
@@ -182,7 +184,7 @@ See `references/re-summarization-bug.md` for full root-cause analysis and reprod
 
 - Endpoint: `http://hq-ai:11434` (configurable via `TRAINING_LLM_URL` env var)
 - Model: `qwen3.5:9b` (configurable via `TRAINING_LLM_MODEL`)
-- Timeout: 120s per call (set in `call_ollama()`)
+- Timeout: 300s per call (set in `call_ollama()`)
 - Summarize prompt: ~200-400 tokens in → ~100 tokens out (5-field template)
 - Grade prompt: ~100 tokens in → **~500-2000 tokens out** (qwen3.5 ignores "return ONLY the letter" and outputs full reasoning chains)
 - Real-world performance: each file requires 2 LLM calls (summarize + grade). Budget ~90s per call at normal Ollama load, so total wall-clock ≈ `num_files × 180s`. Observed runs: 11 files in ~18 min (May 2026), 16 files in ~23 min (May 2026), 18 files in ~20-25 min (May 2026 — all graded C/D), 20 files in ~23 min (May 2026 — all graded C/D), 72 calls (18 summarize + 54 grade) in ~27 min (28 May cron #4 — ~22s/call, moderate load), 52 calls (18 summarize + 34 grade) in ~13 min (27 May — ~15s/call, much faster than typical). Times vary with Ollama load; budget ~100s per LLM call for conservative planning, but recent performance suggests ~15-40s per call depending on load: 52 calls in ~13 min (~15s/call, 27 May — light load), 76 calls in ~50 min (~40s/call, 27 May cron #3 — moderate load), 78 calls in ~90 min (~69s/call, 30 May cron #3 — heavy load/slow).
