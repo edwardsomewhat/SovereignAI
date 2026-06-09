@@ -144,6 +144,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 09 Jun 2026 (cron)⁶     | 276 | 0  | 20 | 0  | 20 |
 | 09 Jun 2026 (cron #2)⁷  | 278 | 11 | 22 | 0  | 22 |
 | 09 Jun 2026 (cron #3)⁸  | 280 | 4  | 24 | 5  | 19 |
+| 09 Jun 2026 (cron #4)⁹  | 281 | 8  | 21 | 1  | 20 |
 
 ¹ Interrupted: grading killed mid-run after 7 min. Recovered by re-running `grade` stage.
 ² Killed: grading hung on final LLM call (DeepSeek API in `do_wait`, no timeout). Killed after ~8 min. Two files made it to curated; ungraded file left in `processed/`.
@@ -153,6 +154,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 ⁶ Trivial session hang: pipeline stuck 367s on a 159-byte "hello" raw file. Recovery: deleted raw file, re-ran. 0 new captures, 0 new summaries, 20 orphaned files graded (0 kept, 20 deleted).
 ⁷ Clean run, no hangs. 1 captured, 11 summarized, 22 graded (0 kept, 22 deleted). Default IP used without override — 7 consecutive runs now with working default IP. 11 of 22 graded files were orphaned from prior interrupted runs. All deletions attributed to grade-extraction bug (verbose qwen3.5 output).
 ⁸ First run timed out in foreground at 600s — expected. Re-ran stages individually: capture (1 new from timed-out run), summarize (4 files), grade (24 files → 5 kept, 19 deleted). 19 of 24 graded files were orphaned from prior interrupted runs. 5 keepers is above-average; qwen3.5 was less verbose on these calls. Hermes security scanner blocks raw IP addresses in shell commands (`curl http://100.84.92.74:...`), reinforcing the hostname preference.
+⁹ Clean run via background mode. First attempt timed out at 600s foreground (expected); background retry with `notify_on_complete=true` completed in ~11 min. 1 captured, 8 summarized, 21 graded (1 kept, 20 deleted). 13 of 21 graded files were orphaned from prior interrupted runs. Faster than typical (~31s per LLM call) suggesting light Ollama load.
 
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
 

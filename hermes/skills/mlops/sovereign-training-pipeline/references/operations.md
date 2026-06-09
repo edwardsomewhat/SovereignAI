@@ -32,6 +32,8 @@ ls ~/.hermes/training_data/curated/*.txt | wc -l     # growing = grade stage
 
 Local LLM endpoint (`qwen3.5:9b` via Ollama) processes **~1 session per minute** for summarization. Grading is slower (~90-120s per file) due to verbose qwen3.5 output (500-2000+ chars of reasoning). A grading run of ~30 files can take 30-50 minutes and may exceed the 600s foreground terminal timeout. When that happens, run `grade` again — it picks up remaining `processed/` files and is safe to re-run idempotently.
 
+**Performance varies with Ollama load:** Times range from ~15-40s per call under light load to ~60-90s under heavy load. Fastest observed: 21 graded files in ~11 min total (~31s/call, 09 Jun 2026 cron #4).
+
 ## Stage behavior
 
 | Stage | What it does | Skipping condition |
