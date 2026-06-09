@@ -198,14 +198,14 @@
     "archived_at": null,
     "created_at": "2026-05-23T16:35:38.412036+00:00",
     "created_by": "agent",
-    "last_patched_at": "2026-06-09T09:11:40.986451+00:00",
-    "last_used_at": "2026-06-09T09:11:48.502004+00:00",
-    "last_viewed_at": "2026-06-09T09:11:48.498936+00:00",
-    "patch_count": 125,
+    "last_patched_at": "2026-06-09T13:32:34.922646+00:00",
+    "last_used_at": "2026-06-09T13:31:59.956584+00:00",
+    "last_viewed_at": "2026-06-09T13:31:59.952951+00:00",
+    "patch_count": 128,
     "pinned": false,
     "state": "active",
-    "use_count": 134,
-    "view_count": 134
+    "use_count": 135,
+    "view_count": 135
   },
   "web-search/kiwix": {
     "archived_at": null,
