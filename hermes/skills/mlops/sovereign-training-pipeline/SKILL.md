@@ -142,6 +142,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 08 Jun 2026 (cron #3)⁴  | 271 | 5  | 26 | 3  | 23 |
 | 08 Jun 2026 (cron #4)⁵  | 273 | 7  | 23 | 0  | 23 |
 | 09 Jun 2026 (cron)⁶     | 276 | 0  | 20 | 0  | 20 |
+| 09 Jun 2026 (cron #2)⁷  | 278 | 11 | 22 | 0  | 22 |
 
 ¹ Interrupted: grading killed mid-run after 7 min. Recovered by re-running `grade` stage.
 ² Killed: grading hung on final LLM call (DeepSeek API in `do_wait`, no timeout). Killed after ~8 min. Two files made it to curated; ungraded file left in `processed/`.
@@ -149,6 +150,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 ⁴ Clean run to completion, no hangs. 1 captured, 5 summarized, 26 graded (3 kept, 23 deleted). Default IP used without override — still reachable. 21 of 26 graded files were orphaned from prior interrupted runs.
 ⁵ Clean run, no hangs. 1 captured, 7 summarized, 23 graded (0 kept, 23 deleted). Default IP used without override — 6 consecutive runs now with working default IP. 16 of 23 graded files were orphaned from prior interrupted runs. All deletions attributed to grade-extraction bug (verbose qwen3.5 output).
 ⁶ Trivial session hang: pipeline stuck 367s on a 159-byte "hello" raw file. Recovery: deleted raw file, re-ran. 0 new captures, 0 new summaries, 20 orphaned files graded (0 kept, 20 deleted).
+⁷ Clean run, no hangs. 1 captured, 11 summarized, 22 graded (0 kept, 22 deleted). Default IP used without override — 7 consecutive runs now with working default IP. 11 of 22 graded files were orphaned from prior interrupted runs. All deletions attributed to grade-extraction bug (verbose qwen3.5 output).
 
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
 
