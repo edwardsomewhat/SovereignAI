@@ -141,12 +141,14 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 08 Jun 2026 (cron #2)³ | 269 | 1  | 24 | 0  | 24 |
 | 08 Jun 2026 (cron #3)⁴  | 271 | 5  | 26 | 3  | 23 |
 | 08 Jun 2026 (cron #4)⁵  | 273 | 7  | 23 | 0  | 23 |
+| 09 Jun 2026 (cron)⁶     | 276 | 0  | 20 | 0  | 20 |
 
 ¹ Interrupted: grading killed mid-run after 7 min. Recovered by re-running `grade` stage.
 ² Killed: grading hung on final LLM call (DeepSeek API in `do_wait`, no timeout). Killed after ~8 min. Two files made it to curated; ungraded file left in `processed/`.
 ³ Clean run: 1 new session summarized, 24 graded (1 new + 23 orphaned from prior interrupted runs). All 24 deleted — qwen3.5 verbose on every call. Grade-extraction bug unpatched; 0-keeper runs are the norm. Default IP (100.84.92.74) worked without override.
 ⁴ Clean run to completion, no hangs. 1 captured, 5 summarized, 26 graded (3 kept, 23 deleted). Default IP used without override — still reachable. 21 of 26 graded files were orphaned from prior interrupted runs.
 ⁵ Clean run, no hangs. 1 captured, 7 summarized, 23 graded (0 kept, 23 deleted). Default IP used without override — 6 consecutive runs now with working default IP. 16 of 23 graded files were orphaned from prior interrupted runs. All deletions attributed to grade-extraction bug (verbose qwen3.5 output).
+⁶ Trivial session hang: pipeline stuck 367s on a 159-byte "hello" raw file. Recovery: deleted raw file, re-ran. 0 new captures, 0 new summaries, 20 orphaned files graded (0 kept, 20 deleted).
 
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
 
@@ -266,6 +268,27 @@ for f in processed/*.txt; do head -c 13 "$f" | grep -q "^INTERACTION:" || rm "$f
 ```
 
 **Workaround — batch grading with non-thinking model:** When grading is needed and the pipeline's qwen3.5:9b is too slow or produces unparseable output, switch to batch grading with `hermes3:8b` (non-thinking, 4.7 GB). Group 5-10 summaries per batch, ask for `FILENAME:GRADE` output. See [`references/garbage-summaries-and-batch-grading.md`](references/garbage-summaries-and-batch-grading.md) for the full pattern.
+
+### Pitfall: Trivial Sessions Block the Summarize Stage
+
+Trivial 1-message sessions (e.g., "hello / what's going on?") produce tiny raw files (≤200 bytes) that cause `call_ollama()` to hang for the full 300s timeout. qwen3.5:9b returns `response: ""` with a verbose `thinking` chain that never resolves into a structured summary. The process shows 0 CPU time (`ps -o stat → S`) and never advances past the stuck file.
+
+**Detection:** Find raw files with no matching processed or curated:
+```bash
+for f in ~/.hermes/training_data/raw/*.md; do
+  base=$(basename "$f" .md)
+  if [ ! -f ~/.hermes/training_data/processed/"${base}.txt" ] && \
+     [ ! -f ~/.hermes/training_data/curated/"${base}.txt" ]; then
+    echo "PENDING: $base  ($(wc -c < "$f") bytes)"
+  fi
+done
+```
+
+**Recovery:** Delete the trivial raw file and re-run. Sessions this small would grade C/D anyway — no training value lost.
+```bash
+rm ~/.hermes/training_data/raw/session_<id>.md
+./.hermes/hermes-agent/venv/bin/python training_pipeline.py all
+```
 
 ## Grading Rubric
 
