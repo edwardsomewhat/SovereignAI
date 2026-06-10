@@ -39,14 +39,14 @@ cd /home/fated
 **⚠️ Always run in background mode.** The pipeline makes one LLM call per session (Ollama at `http://hq-ai:11434`, model `qwen3.5:9b`). The default `http://100.84.92.74:11434` is the same machine — it has been consistently reachable since ~31 May 2026, so omitting `TRAINING_LLM_URL` now works. Still, the hostname `hq-ai` is canonical and safer (avoids Tailscale subnet-routing dependency). With 100+ sessions, foreground mode will time out at 600s. Use:
 
 ```bash
-TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 ./.hermes/hermes-agent/venv/bin/python training_pipeline.py all
+TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 stdbuf -oL -eL ./.hermes/hermes-agent/venv/bin/python training_pipeline.py all
 ```
 
-The `PYTHONUNBUFFERED=1` is **critical** — without it, Python buffers stdout when not connected to a TTY, and the capture/summarize stage output is lost. Only the grade stage output flushes on exit. The `TRAINING_LLM_URL=http://hq-ai:11434` is also critical — the hardcoded default IP `100.84.92.74:11434` is unreachable from this node. See pitfall below.
+The `PYTHONUNBUFFERED=1` is **critical** — without it, Python buffers stdout when not connected to a TTY, and the capture/summarize stage output is lost. Only the grade stage output flushes on exit. On top of `PYTHONUNBUFFERED=1`, **`stdbuf -oL -eL`** forces line buffering at the libc level (bypassing glibc's default block buffering for pipes). Even with both, OS pipe buffering can still delay output for the grade stage until process exit — the log-file redirect approach (`> /tmp/pipeline_out.txt`) remains the most reliable method for real-time visibility. The `TRAINING_LLM_URL=http://hq-ai:11434` is also critical — the hardcoded default IP `100.84.92.74:11434` is unreachable from this node. See pitfall below.
 
 Hermes invocation:
 ```bash
-terminal(command="TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 .../venv/bin/python training_pipeline.py all", background=true, notify_on_complete=true, timeout=1800)
+terminal(command="TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 stdbuf -oL -eL .../venv/bin/python training_pipeline.py all", background=true, notify_on_complete=true, timeout=1800)
 ```
 
 Then poll with `process(action="poll", session_id="...")` or watch file counts:
@@ -61,7 +61,7 @@ File-count monitoring is one way to track progress — `PYTHONUNBUFFERED=1` does
 
 ```bash
 # Option A: Log-file redirect (best for real-time progress)
-.../python training_pipeline.py all > /tmp/pipeline_out.txt 2>&1
+TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 stdbuf -oL -eL .../python training_pipeline.py all > /tmp/pipeline_out.txt 2>&1
 
 # Then from another terminal call:
 cat /tmp/pipeline_out.txt
@@ -147,6 +147,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 09 Jun 2026 (cron #4)⁹  | 281 | 8  | 21 | 1  | 20 |
 | 09 Jun 2026 (cron #5)¹⁰  | 284 | 2  | 14 | 0  | 14 |
 | 10 Jun 2026 (cron)¹¹     | 286 | 3  | 21 | 4  | 17 |
+| 10 Jun 2026 (cron #2)¹²  | 288 | 1  | 9  | 1  | 8  |
 
 ¹ Interrupted: grading killed mid-run after 7 min. Recovered by re-running `grade` stage.
 ² Killed: grading hung on final LLM call (DeepSeek API in `do_wait`, no timeout). Killed after ~8 min. Two files made it to curated; ungraded file left in `processed/`.
@@ -159,6 +160,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 ⁹ Clean run via background mode. First attempt timed out at 600s foreground (expected); background retry with `notify_on_complete=true` completed in ~11 min. 1 captured, 8 summarized, 21 graded (1 kept, 20 deleted). 13 of 21 graded files were orphaned from prior interrupted runs. Faster than typical (~31s per LLM call) suggesting light Ollama load.
 ¹⁰ First `all` attempt timed out at 600s foreground. Re-ran stages individually: capture (0 new — state already caught up), summarize (2 files), grade (14 files → 0 kept, 14 deleted). 12 of 14 graded were orphaned from prior interrupted runs. Model output included "THIS FEELS LIKE B TO ME...", "THIS APPEARS TO BE AN EXAMPLE WHERE THERE WAS A PROBLEM THAT NEEDED SOLVING THROUGH ARCHITECTURAL ADAPTATION... WHICH COULD MAKE IT A OR B", and multi-paragraph reasoning chains — all failed exact-match. The `process(action="wait")` 60s clamp prevented monitoring the grade stage; had to run it directly with `terminal(timeout=600)`. Hermes security scanner blocked diagnostic `curl` to raw IP, confirming hostname-only policy. LLM endpoint confirmed healthy (qwen3.5 responds in ~11-19s via `urllib.request`).
 ¹¹ Clean run via background mode with log-file redirect (`> /tmp/pipeline_out.txt`). Pre-flight checks passed: hq-ai reachable (4ms ping), ollama active, model warm. 0 new sessions captured (state caught up), 3 summarized, 21 graded (3 new + 18 orphaned from prior interrupted runs). 4 kept (3 A, 1 B — above-average keeper rate attributed to recent engineering sessions), 17 deleted. ~11 min wall-clock. No hangs, no leftovers.
+¹² Individual stages run (not `all`). Capture: 0 new (state caught up). Summarize: 1 raw file (though possibly redundant — already-curated session under different filename). Grade: 9 files graded → 1 kept (B), 8 deleted. `stdbuf -oL -eL` used to force line buffering; grade output still only appeared at process exit due to OS pipe buffering. 8 of 9 orphaned from prior interrupted runs. Standard grade-extraction pattern: verbose LLM output on 3 of 9 files, only 1 clean "B:" prefix matched.
 
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
 
