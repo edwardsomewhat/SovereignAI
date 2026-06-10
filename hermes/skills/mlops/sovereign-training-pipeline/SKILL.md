@@ -73,6 +73,14 @@ ls ~/.hermes/training_data/curated/*.txt | wc -l     # growing = grade stage
 
 # Option C: State file (capture stage only)
 cat ~/.hermes/training_data/pipeline_state.json
+
+# Option D: execute_code monitoring script (best for automated cron-job monitoring)
+# Use execute_code with a Python script that loops every 30s, checks file counts,
+# and uses os.kill(pid, 0) to detect when the background process exits.
+# Template at scripts/monitor-pipeline.py — invoke with:
+#   from hermes_tools import terminal
+#   terminal("...python training_pipeline.py all > /tmp/pipeline_out.txt 2>&1", background=True, notify_on_complete=True, timeout=1800)
+#   # Then run the monitor script with the PID from the background output
 ```
 
 **⚠️ Pitfall: `process(action="wait")` is clamped to 60s.** Regardless of the timeout value you pass (e.g., 180s or 1800s), the wait action is internally clamped to 60 seconds. You cannot do a single long blocking wait — you must poll in a loop. Use `sleep N` in combination with file-count checks between polls.
@@ -148,6 +156,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 09 Jun 2026 (cron #5)¹⁰  | 284 | 2  | 14 | 0  | 14 |
 | 10 Jun 2026 (cron)¹¹     | 286 | 3  | 21 | 4  | 17 |
 | 10 Jun 2026 (cron #2)¹²  | 288 | 1  | 9  | 1  | 8  |
+| 10 Jun 2026 (cron #3)¹³  | 290 | 3  | 16 | 3  | 13 |
 
 ¹ Interrupted: grading killed mid-run after 7 min. Recovered by re-running `grade` stage.
 ² Killed: grading hung on final LLM call (DeepSeek API in `do_wait`, no timeout). Killed after ~8 min. Two files made it to curated; ungraded file left in `processed/`.
