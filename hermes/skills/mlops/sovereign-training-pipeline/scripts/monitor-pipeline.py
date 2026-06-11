@@ -2,10 +2,16 @@
 """Monitor a running Sovereign training pipeline background process.
 Tracks directory file counts and detects process exit.
 
-Usage from execute_code:
-  from hermes_tools import terminal
-  terminal("...pipeline...", background=True, notify_on_complete=True, timeout=1800)
-  # Then call this script's logic with the PID from background output.
+WARNING: execute_code has a 300s hard timeout. This script's default
+max_wait of 1800s will ALWAYS time out when run via execute_code.
+For grade stages taking >5 min, use one of these instead:
+  1. File-count monitoring via terminal() every 30-60s (Option B in skill)
+  2. Log-file redirect + tail polling (Option A in skill)
+  3. Run this script directly from terminal in background mode
+     (not via execute_code), e.g.:
+     terminal("python scripts/monitor-pipeline.py <PID>", background=True, timeout=1800)
+
+For fast runs (<5 min) where execute_code is sufficient, reduce max_wait.
 """
 
 import os

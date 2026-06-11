@@ -81,6 +81,11 @@ cat ~/.hermes/training_data/pipeline_state.json
 #   from hermes_tools import terminal
 #   terminal("...python training_pipeline.py all > /tmp/pipeline_out.txt 2>&1", background=True, notify_on_complete=True, timeout=1800)
 #   # Then run the monitor script with the PID from the background output
+# ⚠️ execute_code has a 300s hard timeout. For grade stages taking 10+ minutes,
+# the monitor will be killed before completion. Options: (a) use file-count monitoring
+# (Option B) which has no timeout, (b) run monitoring in background terminal instead,
+# or (c) use the log-file redirect approach (Option A) and poll the log file with
+# short terminal() calls.
 ```
 
 **⚠️ Pitfall: `process(action="wait")` is clamped to 60s.** Regardless of the timeout value you pass (e.g., 180s or 1800s), the wait action is internally clamped to 60 seconds. You cannot do a single long blocking wait — you must poll in a loop. Use `sleep N` in combination with file-count checks between polls.
@@ -88,6 +93,8 @@ cat ~/.hermes/training_data/pipeline_state.json
 **⚠️ Pitfall: Foreground terminal timeout caps monitoring sleeps.** Hermes enforces a 600s maximum foreground terminal timeout. When monitoring with `sleep N && echo ...`, the total `sleep + terminal timeout` must stay under 600s. Keep sleeps at ≤580s to avoid `"Foreground timeout exceeds the maximum of 600s"` rejections. Pattern:
 
 **⚠️ Pitfall: Grade stage can time out mid-run with verbose LLM output.** qwen3.5:9b's verbose grading responses (500-2000+ chars of reasoning per file) mean that grading even ~30 files can exceed the 600s foreground terminal timeout. When this happens, processed files that weren't reached remain in `processed/`. **1-3 leftover files is the norm — not a failure.** Recovery: just run `grade` again — it picks up the remaining files. The `grade` stage is idempotent and safe to re-run. On subsequent runs, check `ls processed/*.txt | wc -l` to see if any files were left behind.
+
+**⚠️ Pitfall: `all` mode can silently hang with zero output (distinct from grading hang).** When `training_pipeline.py all` is run in background mode, it may produce exactly zero output lines for 80+ seconds while the process shows 0% CPU in `S` state (sleeping/polling). This is different from the known grading hang (which has some output before stalling). The summarize stage's first LLM call is the likely culprit — if the model is slow to respond, the process blocks in `poll_s` with no print() having been called yet. Recovery: kill the process and run stages individually — capture first (instant, confirms state), then summarize, then grade. Running stages individually also gives better visibility: each stage's output is readable at the stage boundary, and you can monitor file counts between stages.
 
 **⚠️ Pitfall: Grading LLM calls can hang indefinitely (no timeout, no error).** This is distinct from the 120s/300s timeout case — the call never returns an error and the process sits in `do_wait` (sleeping on I/O) forever. The process log stops growing (same line count after multiple polls). Detection: poll log line count twice 30s apart — if unchanged and process is in `S` state (`ps -o state -p <pid>`), the grading call is hung. Recovery: `process(action="kill")`, then re-run only the `grade` stage. The summarized files are already in `processed/` and will be graded on the retry. Example from 08 Jun 2026: pipeline hung for 7+ minutes on the final grading call; killed and 2 of ~17 graded files made it to curated.
 ```bash
@@ -157,6 +164,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 10 Jun 2026 (cron)¹¹     | 286 | 3  | 21 | 4  | 17 |
 | 10 Jun 2026 (cron #2)¹²  | 288 | 1  | 9  | 1  | 8  |
 | 10 Jun 2026 (cron #3)¹³  | 290 | 3  | 16 | 3  | 13 |
+| 11 Jun 2026 (cron)¹⁴     | 290 | 1  | 14 | 0  | 14 |
 
 ¹ Interrupted: grading killed mid-run after 7 min. Recovered by re-running `grade` stage.
 ² Killed: grading hung on final LLM call (DeepSeek API in `do_wait`, no timeout). Killed after ~8 min. Two files made it to curated; ungraded file left in `processed/`.
@@ -171,6 +179,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 ¹¹ Clean run via background mode with log-file redirect (`> /tmp/pipeline_out.txt`). Pre-flight checks passed: hq-ai reachable (4ms ping), ollama active, model warm. 0 new sessions captured (state caught up), 3 summarized, 21 graded (3 new + 18 orphaned from prior interrupted runs). 4 kept (3 A, 1 B — above-average keeper rate attributed to recent engineering sessions), 17 deleted. ~11 min wall-clock. No hangs, no leftovers.
 ¹² Individual stages run (not `all`). Capture: 0 new (state caught up). Summarize: 1 raw file (though possibly redundant — already-curated session under different filename). Grade: 9 files graded → 1 kept (B), 8 deleted. `stdbuf -oL -eL` used to force line buffering; grade output still only appeared at process exit due to OS pipe buffering. 8 of 9 orphaned from prior interrupted runs. Standard grade-extraction pattern: verbose LLM output on 3 of 9 files, only 1 clean "B:" prefix matched.
 ¹³ Clean `all` run via background mode.First foreground attempt timed out at 600s (expected — documented pitfall). Background retry with `notify_on_complete=true` and `PYTHONUNBUFFERED=1` completed. No stdout captured by process manager despite `PYTHONUNBUFFERED=1` (OS pipe buffering). Used `execute_code` monitoring script (Option D) to track progress via filesystem file counts. Detected completion at ~60s. 0 captured (state caught up), 3 summarized, 16 graded (13 orphaned from prior interrupted runs). 3 kept (A), 13 deleted. stdout captured at process exit confirmed counts. ~60s wall-clock (fast — Ollama lightly loaded). `process(action="wait")` 60s clamp reconfirmed; `execute_code` monitoring with `os.kill(pid,0)` is the most efficient automated monitoring pattern.
+¹⁴ First `all` attempt timed out at 600s foreground (expected). Second attempt in background with `PYTHONUNBUFFERED=1` hung silently: 0 output, 0% CPU, process in `S` state for 80s+. Killed. Switched to running stages individually (capture → summarize → grade) which succeeded. 0 captured (state caught up), 1 summarized, 14 graded (13 orphaned from prior interrupted runs). 0 kept, 14 deleted — standard grade-extraction bug (qwen3.5 verbose output on all grading calls). ~11 min wall-clock for the grade stage alone. `execute_code` monitoring script timed out at its own 300s limit, confirming it's unsuitable for slow grading runs. Ollama confirmed reachable (27s for a 5-word ping), model warm. Pipeline used default IP `100.84.92.74:11434` without `TRAINING_LLM_URL` override — host reachable.
 
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
 
