@@ -17,13 +17,13 @@
     "created_at": "2026-05-16T21:49:38.299458+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-05-16T21:49:47.230269+00:00",
-    "last_used_at": "2026-06-04T23:24:12.696027+00:00",
-    "last_viewed_at": "2026-06-04T23:24:12.689393+00:00",
+    "last_used_at": "2026-06-12T00:05:24.373487+00:00",
+    "last_viewed_at": "2026-06-12T00:05:24.371609+00:00",
     "patch_count": 1,
     "pinned": false,
     "state": "active",
-    "use_count": 3,
-    "view_count": 3
+    "use_count": 4,
+    "view_count": 4
   },
   "devops/tailscale-mcp": {
     "archived_at": null,
@@ -95,26 +95,26 @@
     "created_at": "2026-05-18T14:28:36.056832+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-05-19T16:50:52.610846+00:00",
-    "last_used_at": "2026-06-04T23:24:12.715746+00:00",
-    "last_viewed_at": "2026-06-04T23:24:12.707535+00:00",
+    "last_used_at": "2026-06-12T00:05:24.381806+00:00",
+    "last_viewed_at": "2026-06-12T00:05:24.378047+00:00",
     "patch_count": 4,
     "pinned": false,
     "state": "active",
-    "use_count": 7,
-    "view_count": 7
+    "use_count": 8,
+    "view_count": 8
   },
   "import-external-agent-skills": {
     "archived_at": null,
     "created_at": "2026-05-18T13:50:09.655019+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-05-18T14:26:05.789496+00:00",
-    "last_used_at": "2026-06-04T23:24:12.681420+00:00",
-    "last_viewed_at": "2026-06-04T23:24:12.677817+00:00",
+    "last_used_at": "2026-06-12T00:05:24.382649+00:00",
+    "last_viewed_at": "2026-06-12T00:05:24.380039+00:00",
     "patch_count": 7,
     "pinned": false,
     "state": "active",
-    "use_count": 7,
-    "view_count": 7
+    "use_count": 8,
+    "view_count": 8
   },
   "kiwix": {
     "archived_at": null,
@@ -134,13 +134,13 @@
     "created_at": "2026-05-18T14:16:18.350158+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-06-04T23:26:27.541711+00:00",
-    "last_used_at": "2026-06-04T23:26:55.760320+00:00",
-    "last_viewed_at": "2026-06-04T23:26:55.759120+00:00",
+    "last_used_at": "2026-06-12T00:05:24.380991+00:00",
+    "last_viewed_at": "2026-06-12T00:05:24.376764+00:00",
     "patch_count": 7,
     "pinned": false,
     "state": "active",
-    "use_count": 8,
-    "view_count": 8
+    "use_count": 9,
+    "view_count": 9
   },
   "qwen3-tts-voice-clone": {
     "archived_at": null,
@@ -160,13 +160,13 @@
     "created_at": "2026-05-27T22:08:47.592873+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-05-27T22:47:21.256616+00:00",
-    "last_used_at": "2026-06-04T23:24:12.710442+00:00",
-    "last_viewed_at": "2026-06-04T23:24:12.699406+00:00",
+    "last_used_at": "2026-06-12T00:05:24.379040+00:00",
+    "last_viewed_at": "2026-06-12T00:05:24.375410+00:00",
     "patch_count": 9,
     "pinned": false,
     "state": "active",
-    "use_count": 11,
-    "view_count": 11
+    "use_count": 12,
+    "view_count": 12
   },
   "searxng": {
     "archived_at": null,
@@ -199,13 +199,13 @@
     "created_at": "2026-05-23T16:35:38.412036+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-06-11T16:54:25.079295+00:00",
-    "last_used_at": "2026-06-11T20:53:47.611605+00:00",
-    "last_viewed_at": "2026-06-11T20:53:47.610472+00:00",
+    "last_used_at": "2026-06-12T00:05:24.364374+00:00",
+    "last_viewed_at": "2026-06-12T00:05:24.361152+00:00",
     "patch_count": 158,
     "pinned": false,
     "state": "active",
-    "use_count": 156,
-    "view_count": 156
+    "use_count": 157,
+    "view_count": 157
   },
   "web-search/kiwix": {
     "archived_at": null,
