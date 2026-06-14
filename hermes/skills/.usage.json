@@ -90,6 +90,19 @@
     "use_count": 1,
     "view_count": 1
   },
+  "headless-linux-hardware": {
+    "archived_at": null,
+    "created_at": "2026-06-14T01:18:35.988644+00:00",
+    "created_by": null,
+    "last_patched_at": null,
+    "last_used_at": "2026-06-14T01:18:43.205303+00:00",
+    "last_viewed_at": "2026-06-14T01:18:43.203879+00:00",
+    "patch_count": 0,
+    "pinned": false,
+    "state": "active",
+    "use_count": 2,
+    "view_count": 2
+  },
   "hermes-node-bootstrap": {
     "archived_at": null,
     "created_at": "2026-05-18T14:28:36.056832+00:00",
@@ -133,14 +146,14 @@
     "archived_at": null,
     "created_at": "2026-05-18T14:16:18.350158+00:00",
     "created_by": "agent",
-    "last_patched_at": "2026-06-04T23:26:27.541711+00:00",
-    "last_used_at": "2026-06-12T00:05:24.380991+00:00",
-    "last_viewed_at": "2026-06-12T00:05:24.376764+00:00",
-    "patch_count": 7,
+    "last_patched_at": "2026-06-14T01:19:05.709751+00:00",
+    "last_used_at": "2026-06-14T01:18:36.016405+00:00",
+    "last_viewed_at": "2026-06-14T01:18:36.013985+00:00",
+    "patch_count": 10,
     "pinned": false,
     "state": "active",
-    "use_count": 9,
-    "view_count": 9
+    "use_count": 10,
+    "view_count": 10
   },
   "qwen3-tts-voice-clone": {
     "archived_at": null,

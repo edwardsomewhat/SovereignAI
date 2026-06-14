@@ -288,6 +288,12 @@ hermes mcp list
 
 The server script is at `scripts/server.py` in this skill's directory. It wraps the same Tailscale CLI and local daemon API covered in Method 3 above into structured MCP tools.
 
+
+## Reference files
+
+- `references/smb-protocol-reference.md` — Detailed SMB protocol usage with smbprotocol library
+- `references/agent-knowledge-transfer.md` — Pattern for sharing working knowledge with other Hermes agents on the tailnet
+
 ## Using Credentials
 
 - The user may provide passwords in freeform text. Multiple options may be given; try them in order
@@ -304,6 +310,10 @@ The server script is at `scripts/server.py` in this skill's directory. It wraps 
 5. **smbprotocol installed to user site-packages is not visible in execute_code sandbox.** Write SMB scripts to files and run them via `python3 /path/to/script.py` instead
 6. **Tailscale local API requires Unix socket access.** The `execute_code` sandbox cannot access Unix sockets directly. Use `terminal()` to run curl and parse the JSON output separately
 7. **Tailscale SSH host key verification failure.** `tailscale ssh <host>` can fail with "No ED25519 host key is known" if the FQDN resolves via Tailscale DNS but the SSH daemon only binds to the raw IP. Fallback: `sshpass -p '<password>' ssh -o StrictHostKeyChecking=accept-new <user>@<tailscale-ip> "<command>"` using the raw Tailscale IPv4 (e.g., `100.84.226.78`) instead of the FQDN
+
+8. **Tailscale SSH "failed to look up local user".** `tailscale ssh <host>` fails with "failed to look up local user \"<username>\"" when the target node hasn't authorized that Tailscale user for SSH. This is a per-node ACL setting — not something you can fix mid-session. Fallback immediately to password-based SSH: `sshpass -p '<password>' ssh -o StrictHostKeyChecking=accept-new <user>@<tailscale-ip> "<command>"`.
+
+9. **Taildrop unreliability.** `tailscale file cp` may report success but the file never appears in the target's Taildrop inbox, or `tailscale file get` returns nothing despite a successful send. This is a known intermittent issue. When delivering files to another agent/node, prefer `sshpass -p '<password>' scp` as the primary path. Use Taildrop only as a convenience when neither side has SSH credentials available.
 
 ## Verification Checklist
 
