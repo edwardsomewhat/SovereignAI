@@ -33,12 +33,25 @@ def run():
 
     print(f"\n{'='*60}")
     print(f"  HERMES CREW — HIERARCHICAL EXECUTION")
-    print(f"  Supervisor: DeepSeek V4 Flash  |  Agents: DeepSeek Chat")
-    print(f"  Crew size: 11 agents")
+    print(f"  Supervisor: DeepSeek V4 Flash  |  12 specialist agents")
     print(f"{'='*60}\n")
     print(f"Request: {user_input}\n")
 
-    result = crew_instance.kickoff(inputs={"topic": user_input})
+    result = crew_instance.kickoff(inputs={
+        "creative_brief": user_input,
+        "topic": user_input,
+        "image_spec": "",
+        "video_spec": "",
+        "copy_spec": "",
+        "creative_review_spec": "",
+        "code_spec": "",
+        "review_spec": "",
+        "vision_spec": "",
+        "fab_spec": "",
+        "qa_spec": "",
+        "site_spec": "",
+        "workflow_spec": "",
+    })
 
     print(f"\n{'='*60}")
     print(f"  FINAL RESULT")

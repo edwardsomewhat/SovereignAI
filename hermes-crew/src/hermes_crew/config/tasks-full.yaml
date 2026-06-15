@@ -64,21 +64,6 @@ vision_analysis:
     the spec requires), plus container health confirmation and processing latency.
   agent: vision
 
-creative_scouting:
-  description: >
-    Research the following subject for a creative brief: {scout_spec}.
-    
-    Use web_search to find real-world information — names, dates, venues,
-    descriptions. Use web_fetch on the most relevant results for details.
-    Describe the aesthetic: colors, typography, mood from their materials.
-    
-    Return ONLY the structured format. No commentary. No opinions.
-  expected_output: >
-    Structured research data in the exact OUTPUT FORMAT specified in your goal.
-    EVENT, ORGANIZER, VENUE, DATES, DESCRIPTION, AESTHETIC, SOURCES.
-    All facts must come from your web research — never fabricate.
-  agent: scout
-
 creative_direction:
   description: >
     Parse and execute a creative brief: {creative_brief}.
