@@ -38,18 +38,31 @@
     "use_count": 1,
     "view_count": 1
   },
+  "esp32-firmware": {
+    "archived_at": null,
+    "created_at": "2026-06-16T22:01:22.005754+00:00",
+    "created_by": "agent",
+    "last_patched_at": "2026-06-16T22:01:36.160380+00:00",
+    "last_used_at": null,
+    "last_viewed_at": null,
+    "patch_count": 1,
+    "pinned": false,
+    "state": "active",
+    "use_count": 0,
+    "view_count": 0
+  },
   "firecrawl": {
     "archived_at": null,
     "created_at": "2026-05-15T21:08:33.476542+00:00",
     "created_by": null,
     "last_patched_at": "2026-05-16T23:59:09.652993+00:00",
-    "last_used_at": "2026-05-16T23:59:29.169074+00:00",
-    "last_viewed_at": "2026-05-16T23:59:29.166107+00:00",
+    "last_used_at": "2026-06-16T21:50:24.724163+00:00",
+    "last_viewed_at": "2026-06-16T21:50:24.723095+00:00",
     "patch_count": 12,
     "pinned": false,
     "state": "active",
-    "use_count": 17,
-    "view_count": 17
+    "use_count": 18,
+    "view_count": 18
   },
   "graphify": {
     "archived_at": null,
@@ -186,13 +199,13 @@
     "created_at": "2026-05-15T02:27:22.220798+00:00",
     "created_by": null,
     "last_patched_at": "2026-05-16T21:50:41.993526+00:00",
-    "last_used_at": "2026-05-16T23:58:35.360433+00:00",
-    "last_viewed_at": "2026-05-16T23:58:35.357108+00:00",
+    "last_used_at": "2026-06-16T21:49:27.331758+00:00",
+    "last_viewed_at": "2026-06-16T21:49:27.330729+00:00",
     "patch_count": 3,
     "pinned": false,
     "state": "active",
-    "use_count": 15,
-    "view_count": 15
+    "use_count": 16,
+    "view_count": 16
   },
   "sovereign-rag": {
     "archived_at": null,
