@@ -86,4 +86,25 @@ The 1-2 keepers observed in some runs were sessions where the model happened to 
 | 06 Jun (cron #3)   | 39 | 10 | **Highest keeper rate to date (25.6%).** 1 new captured + 11 backlog + 27 orphaned. 10 kept, 29 deleted. Curated 212→222. ~14 min runtime. qwen3.5 still verbose — output full of "ACTUALLY, RECONSIDERING" and multi-paragraph reasoning chains. Default IP worked (no override).
 | 06 Jun (cron #4)   | 31 | 3  | 1 new captured + 3 backlog + 27 orphaned from prior interrupted run. 3 kept, 28 deleted. Curated 222→225. First pipeline attempt timed out at 600s foreground; re-ran in background. qwen3.5 verbose on every call — full reasoning chains in log. Keeper rate: 9.7%. Grade-extraction bug still unpatched.
 | 06 Jun (cron #5)   | 30 | 3  | 0 new + 3 backlog + 27 orphaned. 3 kept, 27 deleted. Curated 225→228. First attempt timed out at 600s foreground; killed and re-ran stages individually with `PYTHONUNBUFFERED=1`. qwen3.5 extremely verbose — grade strings contained full internal monologue ("WAIT, LET'S RE-READ THE CRITERIA FOR C VS:", multi-paragraph chains). 27/30 grades were garbled non-letter strings (all deleted). The 3 keepers were luck — bare letter output. Grade-extraction bug still unpatched. Default IP worked.
-| 09 Jun 2026 (cron #5) | 14 | 0 | First `all` timed out; stages run individually. 2 summarized + 12 orphaned. All 14 deleted. Verbose outputs included "THIS FEELS LIKE B TO ME GIVEN IT INVOLVES MULTI-TURN REASONING WITH SUCCESSFUL TOOL", "THIS APPEARS TO BE AN EXAMPLE WHERE THERE WAS A PROBLEM THAT NEEDED SOLVING THROUGH ARCHITECTURAL ADAPTATION... WHICH COULD MAKE IT A OR B DEPENDING ON WHETHER MULTI-TURN REASONING OCCURRED", and a full multi-paragraph evaluation for another. All failed exact-match. Grade-extraction bug still unpatched. Curated unchanged at 263. |
+| 09 Jun 2026 (cron #5) | 14 | 0 | First `all` timed out; stages run individually. 2 summarized + 12 orphaned. All 14 deleted. Verbose outputs included "THIS FEELS LIKE B TO ME...", "THIS APPEARS TO BE AN EXAMPLE WHERE THERE WAS A PROBLEM THAT NEEDED SOLVING THROUGH ARCHITECTURAL ADAPTATION... WHICH COULD MAKE IT A OR B", and multi-paragraph evaluations. All failed exact-match. Curated unchanged at 263. |
+| 16 Jun 2026 (cron)    | 16 | 1 | 1 summarized + 15 orphaned. 1 kept (A), 15 deleted — sole keeper was this cron session itself. **Meta-recursion:** grader encountered pipeline-summary sessions and output `"THIS APPEARS TO BE A META-INTERACTION ABOUT THE GRADING PROCESS ITSELF RATHER THAN ONE SPECIFIC TRAINING INTERACTION"` and `"THIS LOOKS LIKE A SUMMARY OF *PREVIOUS* INTERACTIONS BEING PROCESSED"` — the grader is now confused by its own reflection in the training corpus. All verbose outputs failed exact-match; the single keeper was a rare bare-letter output. ~7 min wall-clock. |
+
+## Meta-Recursion Failure Mode (16 Jun 2026)
+
+As the curated corpus grows, an increasing fraction of raw sessions are themselves pipeline cron runs. When the grader encounters a summary whose INTERACTION is "implementation" and whose SUBJECT describes "training data capture operation" or "pipeline grading results," the model gets confused — it's being asked to grade a description of grading. Real output from this run:
+
+```
+session_cron_8c5332db9b3a_20260615_142113:
+  WAIT, LOOKING AT THE INSTRUCTION: "INTERACTION: IMPLEMENTATION | ARCHITECTURE | DISCOVERY] ...
+  CONFLICT: ALL 14 GRADED SESSIONS SCORED C/D — NONE SURVIVED CURATION (QUALITY ISSUE)
+  RESOLUTION: PIPELINE EXECUTED SUCCESSFULLY..."
+  THIS LOOKS LIKE A SUMMARY OF *PREVIOUS* INTERACTIONS BEING PROCESSED.
+
+session_cron_8c5332db9b3a_20260616_110821:
+  THIS APPEARS TO BE A META-INTERACTION ABOUT THE GRADING PROCESS ITSELF RATHER THAN 
+  ONE SPECIFIC TRAINING INTERACTION. GIVEN THAT ALL 13 GRADED SESSIONS WERE DISCARDED 
+  AND ONLY 1 WAS CAPTURED INTO RAW DATA BEFORE ALSO BEING FILTERED OUT...
+  THIS REPRESENTS FAILURES IN MEETING CURATION STANDARDS, WHICH ALIGNS WITH D (FAILURES/DE...
+```
+
+The grader correctly identifies that these are meta-interactions but gets stuck in recursive reasoning. The practical effect is the same as other verbose output (exact-match deletion), but the confusion pattern is distinct: the model can't decide whether to grade the pipeline session's content (a report about grading) or the session's quality as a training example. Result: all are deleted regardless of internal assessment.
