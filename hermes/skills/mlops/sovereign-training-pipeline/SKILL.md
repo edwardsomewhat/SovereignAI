@@ -185,6 +185,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 16 Jun 2026 (cron)¹⁷     | 330 | 1  | 13 | 16 | 1  | 15 |
 | 17 Jun 2026 (cron)¹⁸     | 331 | 1  | 13 | 15 | 0  | 15 |
 | 17 Jun 2026 (cron #2)¹⁹  | 333 | 0  | 4  | 17 | 0  | 17 |
+| 17 Jun 2026 (cron #3)²⁰  | 334 | 1  | 14 | 18 | 2  | 16 |
 
 ¹ Interrupted: grading killed mid-run after 7 min. Recovered by re-running `grade` stage.
 ² Killed: grading hung on final LLM call (DeepSeek API in `do_wait`, no timeout). Killed after ~8 min. Two files made it to curated; ungraded file left in `processed/`.
