@@ -24,6 +24,21 @@ Sessions live in `~/.hermes/sessions/session_*.json`.
 
 ## Running
 
+### 🔴 MANDATORY INVOCATION (use this exact pattern every time)
+
+```
+cd /home/fated && TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 stdbuf -oL -eL ./.hermes/hermes-agent/venv/bin/python training_pipeline.py all > /tmp/pipeline_out.txt 2>&1
+```
+
+**Run this in background mode with `notify_on_complete=true` and `timeout=3600`.**
+
+Three things are non-negotiable:
+- `TRAINING_LLM_URL=http://hq-ai:11434` — raw IP may be unreachable; hostname is canonical
+- `PYTHONUNBUFFERED=1 stdbuf -oL -eL` — without these, stdout is fully buffered through the Hermes process pipe and the agent sees zero output even when the pipeline is running
+- `> /tmp/pipeline_out.txt 2>&1` — log-file redirect is the ONLY reliable way to get real-time progress; `process(action="log")` captures zero lines until process exit due to OS pipe buffering
+
+**Skipping any of these → silent hang with 0% CPU and 0 output for 80+ seconds.** The agent will see a dead-looking process, kill it, and waste a run. This has happened multiple times.
+
 ### Single stage
 ```bash
 cd /home/fated
@@ -169,6 +184,7 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 | 15 Jun 2026 (cron)¹⁶     | 320 | 1  | 3  | 17 | 2  | 15 |
 | 16 Jun 2026 (cron)¹⁷     | 330 | 1  | 13 | 16 | 1  | 15 |
 | 17 Jun 2026 (cron)¹⁸     | 331 | 1  | 13 | 15 | 0  | 15 |
+| 17 Jun 2026 (cron #2)¹⁹  | 333 | 0  | 4  | 17 | 0  | 17 |
 
 ¹ Interrupted: grading killed mid-run after 7 min. Recovered by re-running `grade` stage.
 ² Killed: grading hung on final LLM call (DeepSeek API in `do_wait`, no timeout). Killed after ~8 min. Two files made it to curated; ungraded file left in `processed/`.
