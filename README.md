@@ -26,7 +26,7 @@ SovereignAI doesn't compete in the subscription AI market — it destroys the pl
 |------|------|----------|-------------|
 | **sovereign** | Brain / Orchestrator | — | Hermes Agent, Crew Supervisor |
 | **conchai** | GPU Workhorse | RTX 3090 24GB | ComfyUI (images, video), SearXNG, Firecrawl, Kiwix |
-| **hq-ai** | LLM Server | Quadro P5000 16GB | Ollama (11 models), ComfyUI (fallback), Qwen TTS |
+| **hq-ai** | LLM Server | Quadro P5000 16GB, 16GB RAM | Ollama (16 models), ComfyUI (fallback), Qwen TTS |
 | **Fat-Eds-Eyes** | Edge Vision | Jetson Orin | Coral TPU (<15ms), Florence 2 (captions/detection/OCR), Ollama edge |
 | **charlotte** | Automation | — | N8N workflows |
 | **csweb** | Web + DB | — | Syndicate CMS, PostgreSQL, Open WebUI |
@@ -141,12 +141,27 @@ Full Shinobi source: [`edwardsomewhat/PiNinja`](https://github.com/edwardsomewha
 
 ## RAG Knowledge Base
 
-ChromaDB at `~/.hermes/rag_db/` — two collections:
+ChromaDB at `~/.hermes/rag_db/` — one collection:
 
-- **sovereign_codex** (34 chunks): Sovereign Codex, Genesis Logs, architecture specs, network maps, email configs
-- **sovereign_docs** (53 chunks): Full Pi Coding Agent documentation (26 pages)
+- **sovereign_rag** (72,916 chunks, 503MB): Full project knowledge — Sovereign Codex, Genesis Logs, architecture specs, network maps, email configs, Pi Coding Agent docs (26 pages), IDE histories from Antigravity/sage/conchAI/DevCSwebs
 
-Query via `sovereign_rag.py query "..."` — gives the agent instant recall of the project's design intent and architecture.
+Query via `sovereign_rag.py query "..."` — gives the agent instant recall of the project's design intent and architecture. Rebuilt June 2026 after ChromaDB Rust binding corruption; stable on chromadb 1.4.1.
+
+---
+
+## Memory Infrastructure
+
+### Mnemosyne (BEAM Architecture)
+
+Deployed June 2026 as the primary agent memory backbone:
+
+- **v3.10.0** — MIT-licensed, single SQLite file, zero external APIs
+- **28 MCP tools** — `mnemosyne_remember`, `mnemosyne_recall`, `mnemosyne_triple_add`, graph traversal, scratchpad, canonical facts, etc.
+- **Recall latency:** 2.67ms p50 (100% precision@K on benchmarks)
+- **Vector search:** fastembed bge-small-en-v1.5 (no GPU required)
+- **Dual-write active** with Honcho through June 21, 2026 — cutover to Mnemosyne-primary after 48hr validation
+
+Honcho remains as semantic memory backup. ChromaDB handles RAG (knowledge retrieval). Mnemosyne handles episodic/working memory for agent conversations.
 
 ---
 
@@ -203,7 +218,11 @@ Requires: Linux (Ubuntu 24.04+), Hermes Agent, Tailscale, Python 3.12+.
 | Apr 2026 | CrewAI multi-agent system deployed. 11 agents, hierarchical orchestration. |
 | May 2026 | Creative Department wired end-to-end (Director → Studio → Review). Shinobi v0.1.0 shipped. QA evaluation framework deployed. |
 | May 2026 | Art Studio + Fab Studio added as first-class crew agents. PiNinja added as submodule. RAG re-indexed. |
-| **Next** | Audio (Suno API), Fab Studio end-to-end automation, Scout initial inventory scans, training pipeline cron restoration |
+| Jun 2026 | hq-ai OOM fixed (64GB→16GB RAM, host overcommit resolved). Ollama stable at 16 models. |
+| Jun 2026 | Mnemosyne v3.10.0 deployed — BEAM memory architecture (28 MCP tools, dual-write with Honcho, 2.67ms recall). |
+| Jun 2026 | ChromaDB RAG rebuilt — 72,916 chunks recovered from corrupted SQLite, fresh collection, stable on 1.4.1. |
+| Jun 2026 | General Research track deployed (parallel pipeline, overnight cron, T1/T2 briefs). Agent Protocol directory created. |
+| **Next** | Mnemosyne cutover (June 21), Fab Studio end-to-end automation, Scout initial inventory scans, RAG full validation |
 
 ---
 
