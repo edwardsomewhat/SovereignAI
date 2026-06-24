@@ -17,13 +17,13 @@
     "created_at": "2026-05-16T21:49:38.299458+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-05-16T21:49:47.230269+00:00",
-    "last_used_at": "2026-06-12T00:05:24.373487+00:00",
-    "last_viewed_at": "2026-06-12T00:05:24.371609+00:00",
+    "last_used_at": "2026-06-24T11:02:10.705484+00:00",
+    "last_viewed_at": "2026-06-24T11:02:10.702823+00:00",
     "patch_count": 1,
     "pinned": false,
     "state": "active",
-    "use_count": 4,
-    "view_count": 4
+    "use_count": 5,
+    "view_count": 5
   },
   "devops/tailscale-mcp": {
     "archived_at": null,
@@ -43,13 +43,13 @@
     "created_at": "2026-06-16T22:01:22.005754+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-06-16T22:01:36.160380+00:00",
-    "last_used_at": null,
-    "last_viewed_at": null,
+    "last_used_at": "2026-06-24T11:02:10.721977+00:00",
+    "last_viewed_at": "2026-06-24T11:02:10.719246+00:00",
     "patch_count": 1,
     "pinned": false,
     "state": "active",
-    "use_count": 0,
-    "view_count": 0
+    "use_count": 1,
+    "view_count": 1
   },
   "firecrawl": {
     "archived_at": null,
@@ -121,26 +121,26 @@
     "created_at": "2026-05-18T14:28:36.056832+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-05-19T16:50:52.610846+00:00",
-    "last_used_at": "2026-06-12T00:05:24.381806+00:00",
-    "last_viewed_at": "2026-06-12T00:05:24.378047+00:00",
+    "last_used_at": "2026-06-24T11:02:10.722779+00:00",
+    "last_viewed_at": "2026-06-24T11:02:10.720261+00:00",
     "patch_count": 4,
     "pinned": false,
     "state": "active",
-    "use_count": 8,
-    "view_count": 8
+    "use_count": 9,
+    "view_count": 9
   },
   "import-external-agent-skills": {
     "archived_at": null,
     "created_at": "2026-05-18T13:50:09.655019+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-05-18T14:26:05.789496+00:00",
-    "last_used_at": "2026-06-12T00:05:24.382649+00:00",
-    "last_viewed_at": "2026-06-12T00:05:24.380039+00:00",
+    "last_used_at": "2026-06-24T11:02:10.716691+00:00",
+    "last_viewed_at": "2026-06-24T11:02:10.714263+00:00",
     "patch_count": 7,
     "pinned": false,
     "state": "active",
-    "use_count": 8,
-    "view_count": 8
+    "use_count": 9,
+    "view_count": 9
   },
   "kiwix": {
     "archived_at": null,
@@ -160,13 +160,13 @@
     "created_at": "2026-05-18T14:16:18.350158+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-06-14T01:19:05.709751+00:00",
-    "last_used_at": "2026-06-14T01:18:36.016405+00:00",
-    "last_viewed_at": "2026-06-14T01:18:36.013985+00:00",
+    "last_used_at": "2026-06-24T11:02:10.718252+00:00",
+    "last_viewed_at": "2026-06-24T11:02:10.715199+00:00",
     "patch_count": 10,
     "pinned": false,
     "state": "active",
-    "use_count": 10,
-    "view_count": 10
+    "use_count": 11,
+    "view_count": 11
   },
   "qwen3-tts-voice-clone": {
     "archived_at": null,
@@ -186,13 +186,13 @@
     "created_at": "2026-05-27T22:08:47.592873+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-05-27T22:47:21.256616+00:00",
-    "last_used_at": "2026-06-12T00:05:24.379040+00:00",
-    "last_viewed_at": "2026-06-12T00:05:24.375410+00:00",
+    "last_used_at": "2026-06-24T11:02:10.723589+00:00",
+    "last_viewed_at": "2026-06-24T11:02:10.721082+00:00",
     "patch_count": 9,
     "pinned": false,
     "state": "active",
-    "use_count": 12,
-    "view_count": 12
+    "use_count": 13,
+    "view_count": 13
   },
   "searxng": {
     "archived_at": null,
@@ -225,13 +225,13 @@
     "created_at": "2026-05-23T16:35:38.412036+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-06-17T17:35:05.861169+00:00",
-    "last_used_at": "2026-06-18T14:07:06.348520+00:00",
-    "last_viewed_at": "2026-06-18T14:07:06.347382+00:00",
+    "last_used_at": "2026-06-24T11:02:10.711255+00:00",
+    "last_viewed_at": "2026-06-24T11:02:10.709124+00:00",
     "patch_count": 176,
     "pinned": false,
     "state": "active",
-    "use_count": 178,
-    "view_count": 178
+    "use_count": 179,
+    "view_count": 179
   },
   "web-search/kiwix": {
     "archived_at": null,
