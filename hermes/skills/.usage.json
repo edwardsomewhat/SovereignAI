@@ -225,13 +225,13 @@
     "created_at": "2026-05-23T16:35:38.412036+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-06-17T17:35:05.861169+00:00",
-    "last_used_at": "2026-06-24T11:02:10.711255+00:00",
-    "last_viewed_at": "2026-06-24T11:02:10.709124+00:00",
+    "last_used_at": "2026-06-29T13:22:27.463923+00:00",
+    "last_viewed_at": "2026-06-29T13:22:27.462533+00:00",
     "patch_count": 176,
     "pinned": false,
     "state": "active",
-    "use_count": 179,
-    "view_count": 179
+    "use_count": 180,
+    "view_count": 180
   },
   "web-search/kiwix": {
     "archived_at": null,
