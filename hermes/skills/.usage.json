@@ -17,13 +17,13 @@
     "created_at": "2026-05-16T21:49:38.299458+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-05-16T21:49:47.230269+00:00",
-    "last_used_at": "2026-06-24T11:02:10.705484+00:00",
-    "last_viewed_at": "2026-06-24T11:02:10.702823+00:00",
+    "last_used_at": "2026-07-22T09:10:45.531864+00:00",
+    "last_viewed_at": "2026-07-22T09:10:45.529685+00:00",
     "patch_count": 1,
     "pinned": false,
     "state": "active",
-    "use_count": 5,
-    "view_count": 5
+    "use_count": 6,
+    "view_count": 6
   },
   "devops/tailscale-mcp": {
     "archived_at": null,
@@ -43,13 +43,13 @@
     "created_at": "2026-06-16T22:01:22.005754+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-06-16T22:01:36.160380+00:00",
-    "last_used_at": "2026-06-24T11:02:10.721977+00:00",
-    "last_viewed_at": "2026-06-24T11:02:10.719246+00:00",
+    "last_used_at": "2026-07-22T09:10:45.565691+00:00",
+    "last_viewed_at": "2026-07-22T09:10:45.562731+00:00",
     "patch_count": 1,
     "pinned": false,
     "state": "active",
-    "use_count": 1,
-    "view_count": 1
+    "use_count": 2,
+    "view_count": 2
   },
   "firecrawl": {
     "archived_at": null,
@@ -121,26 +121,26 @@
     "created_at": "2026-05-18T14:28:36.056832+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-05-19T16:50:52.610846+00:00",
-    "last_used_at": "2026-06-24T11:02:10.722779+00:00",
-    "last_viewed_at": "2026-06-24T11:02:10.720261+00:00",
+    "last_used_at": "2026-07-22T09:10:45.563642+00:00",
+    "last_viewed_at": "2026-07-22T09:10:45.559889+00:00",
     "patch_count": 4,
     "pinned": false,
     "state": "active",
-    "use_count": 9,
-    "view_count": 9
+    "use_count": 10,
+    "view_count": 10
   },
   "import-external-agent-skills": {
     "archived_at": null,
     "created_at": "2026-05-18T13:50:09.655019+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-05-18T14:26:05.789496+00:00",
-    "last_used_at": "2026-06-24T11:02:10.716691+00:00",
-    "last_viewed_at": "2026-06-24T11:02:10.714263+00:00",
+    "last_used_at": "2026-07-22T09:10:45.564658+00:00",
+    "last_viewed_at": "2026-07-22T09:10:45.560929+00:00",
     "patch_count": 7,
     "pinned": false,
     "state": "active",
-    "use_count": 9,
-    "view_count": 9
+    "use_count": 10,
+    "view_count": 10
   },
   "kiwix": {
     "archived_at": null,
@@ -160,13 +160,13 @@
     "created_at": "2026-05-18T14:16:18.350158+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-06-14T01:19:05.709751+00:00",
-    "last_used_at": "2026-06-24T11:02:10.718252+00:00",
-    "last_viewed_at": "2026-06-24T11:02:10.715199+00:00",
+    "last_used_at": "2026-07-22T09:10:45.561817+00:00",
+    "last_viewed_at": "2026-07-22T09:10:45.557396+00:00",
     "patch_count": 10,
     "pinned": false,
     "state": "active",
-    "use_count": 11,
-    "view_count": 11
+    "use_count": 12,
+    "view_count": 12
   },
   "qwen3-tts-voice-clone": {
     "archived_at": null,
@@ -186,13 +186,13 @@
     "created_at": "2026-05-27T22:08:47.592873+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-05-27T22:47:21.256616+00:00",
-    "last_used_at": "2026-06-24T11:02:10.723589+00:00",
-    "last_viewed_at": "2026-06-24T11:02:10.721082+00:00",
+    "last_used_at": "2026-07-22T09:10:45.558814+00:00",
+    "last_viewed_at": "2026-07-22T09:10:45.553931+00:00",
     "patch_count": 9,
     "pinned": false,
     "state": "active",
-    "use_count": 13,
-    "view_count": 13
+    "use_count": 14,
+    "view_count": 14
   },
   "searxng": {
     "archived_at": null,
@@ -225,13 +225,13 @@
     "created_at": "2026-05-23T16:35:38.412036+00:00",
     "created_by": "agent",
     "last_patched_at": "2026-06-17T17:35:05.861169+00:00",
-    "last_used_at": "2026-06-29T13:22:27.463923+00:00",
-    "last_viewed_at": "2026-06-29T13:22:27.462533+00:00",
+    "last_used_at": "2026-07-22T09:10:45.555849+00:00",
+    "last_viewed_at": "2026-07-22T09:10:45.551943+00:00",
     "patch_count": 176,
     "pinned": false,
     "state": "active",
-    "use_count": 180,
-    "view_count": 180
+    "use_count": 181,
+    "view_count": 181
   },
   "web-search/kiwix": {
     "archived_at": null,
