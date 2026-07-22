@@ -27,13 +27,13 @@ Sessions live in `~/.hermes/sessions/session_*.json`.
 ### 🔴 RECOMMENDED INVOCATION (best-practice pattern — use when reliability matters)
 
 ```
-cd /home/fated && TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 stdbuf -oL -eL ./.hermes/hermes-agent/venv/bin/python training_pipeline.py all > /tmp/pipeline_out.txt 2>&1
+cd /home/fated && TRAINING_LLM_URL=http://hq-ai:11435 TRAINING_LLM_MODEL=gemma4:latest PYTHONUNBUFFERED=1 stdbuf -oL -eL ./.hermes/hermes-agent/venv/bin/python training_pipeline.py all > /tmp/pipeline_out.txt 2>&1
 ```
 
 **Run this in background mode with `notify_on_complete=true` and `timeout=3600`.**
 
 Three flags that improve reliability:
-- `TRAINING_LLM_URL=http://hq-ai:11434` — hostname is canonical; raw IP may become unreachable
+- `TRAINING_LLM_URL=http://hq-ai:11435` — hostname is canonical; raw IP may become unreachable
 - `PYTHONUNBUFFERED=1 stdbuf -oL -eL` — prevents stdout buffering; without these, real-time output visibility is unreliable
 - `> /tmp/pipeline_out.txt 2>&1` — log-file redirect for real-time progress; `process(action="log")` may capture zero lines until exit
 
@@ -54,14 +54,14 @@ cd /home/fated
 **⚠️ Always run in background mode.** The pipeline makes one LLM call per session (Ollama at `http://hq-ai:11434`, model `qwen3.5:9b`). The default `http://100.84.92.74:11434` is the same machine — it has been consistently reachable since ~31 May 2026, so omitting `TRAINING_LLM_URL` now works. Still, the hostname `hq-ai` is canonical and safer (avoids Tailscale subnet-routing dependency). With 100+ sessions, foreground mode will time out at 600s. Use:
 
 ```bash
-TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 stdbuf -oL -eL ./.hermes/hermes-agent/venv/bin/python training_pipeline.py all
+TRAINING_LLM_URL=http://hq-ai:11435 PYTHONUNBUFFERED=1 stdbuf -oL -eL ./.hermes/hermes-agent/venv/bin/python training_pipeline.py all
 ```
 
-The `PYTHONUNBUFFERED=1` is **critical** — without it, Python buffers stdout when not connected to a TTY, and the capture/summarize stage output is lost. Only the grade stage output flushes on exit. On top of `PYTHONUNBUFFERED=1`, **`stdbuf -oL -eL`** forces line buffering at the libc level (bypassing glibc's default block buffering for pipes). Even with both, OS pipe buffering can still delay output for the grade stage until process exit — the log-file redirect approach (`> /tmp/pipeline_out.txt`) remains the most reliable method for real-time visibility. The `TRAINING_LLM_URL=http://hq-ai:11434` is also critical — the hardcoded default IP `100.84.92.74:11434` is unreachable from this node. See pitfall below.
+The `PYTHONUNBUFFERED=1` is **critical** — without it, Python buffers stdout when not connected to a TTY, and the capture/summarize stage output is lost. Only the grade stage output flushes on exit. On top of `PYTHONUNBUFFERED=1`, **`stdbuf -oL -eL`** forces line buffering at the libc level (bypassing glibc's default block buffering for pipes). Even with both, OS pipe buffering can still delay output for the grade stage until process exit — the log-file redirect approach (`> /tmp/pipeline_out.txt`) remains the most reliable method for real-time visibility. The `TRAINING_LLM_URL=http://hq-ai:11435` is also critical — the hardcoded default IP `100.84.92.74:11434` is unreachable from this node. See pitfall below.
 
 Hermes invocation:
 ```bash
-terminal(command="TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 stdbuf -oL -eL .../venv/bin/python training_pipeline.py all", background=true, notify_on_complete=true, timeout=1800)
+terminal(command="TRAINING_LLM_URL=http://hq-ai:11435 PYTHONUNBUFFERED=1 stdbuf -oL -eL .../venv/bin/python training_pipeline.py all", background=true, notify_on_complete=true, timeout=1800)
 ```
 
 Then poll with `process(action="poll", session_id="...")` or watch file counts:
@@ -76,7 +76,7 @@ File-count monitoring is one way to track progress — `PYTHONUNBUFFERED=1` does
 
 ```bash
 # Option A: Log-file redirect (best for real-time progress)
-TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 stdbuf -oL -eL .../python training_pipeline.py all > /tmp/pipeline_out.txt 2>&1
+TRAINING_LLM_URL=http://hq-ai:11435 PYTHONUNBUFFERED=1 stdbuf -oL -eL .../python training_pipeline.py all > /tmp/pipeline_out.txt 2>&1
 
 # Then from another terminal call:
 cat /tmp/pipeline_out.txt
@@ -207,11 +207,11 @@ Even with `PYTHONUNBUFFERED=1`, Python's small print() output (capture and summa
 ¹⁶ Clean `all` run via background mode. First foreground attempt timed out at 300s; background retry with `notify_on_complete=true` completed. No `PYTHONUNBUFFERED=1`, no `stdbuf`, no `TRAINING_LLM_URL` override — bare `...python training_pipeline.py all`. Default IP `100.84.92.74` worked. 1 new session captured (sessions 319→320), 3 summarized, 17 graded (1 new + 16 orphaned from prior runs). 2 kept, 15 deleted — grade-extraction bug still in effect (qwen3.5 verbose CoT on most calls; the 2 keepers happened to output parseable letter prefixes). ~6 min wall-clock. Process monitoring via `process(action="poll")` in a loop and `execute_code` filesystem checks. Remaining: 320 raw, 305 curated, 0 processed — clean exit, no leftovers.
 ¹⁷ Clean `all` run via background mode. First foreground attempt timed out at 600s; background retry with `notify_on_complete=true`. Bare invocation — no env overrides, no `stdbuf`. Default IP `100.84.92.74` worked. 1 captured (this cron run itself, 329→330 raw), 13 summarized, 16 graded (1 new + 15 orphaned). 1 kept (A), 15 deleted — grade-extraction bug still in effect; sole keeper was this session itself. **New failure mode: meta-recursion confusion.** Grader output on pipeline-summary sessions included `"THIS APPEARS TO BE A META-INTERACTION ABOUT THE GRADING PROCESS ITSELF"` and `"THIS LOOKS LIKE A SUMMARY OF *PREVIOUS* INTERACTIONS BEING PROCESSED"` — the grader is now encountering summaries of its own past output, causing recursive reasoning dead ends. ~7 min wall-clock. 0 processed files remaining — clean exit, no leftovers.
 
-¹⁸ Clean `all` run via background mode. First foreground attempt timed out at 600s; background retry with `notify_on_complete=true`. Bare invocation — no env overrides, no `stdbuf`. Default IP `100.84.92.74` worked. 1 captured, 13 summarized, 15 graded (13 new + 2 orphaned from prior runs). 0 kept, 15 deleted — standard grade-extraction bug (qwen3.5 verbose CoT on all grading calls). **Meta-recursion confirmed persistent** — grader output across multiple files included `\"THIS APPEARS TO BE A META-INTERACTION ABOUT THE GRADING PROCESS ITSELF\"`, confirming this is now the norm for pipeline-summary sessions. ~23 min wall-clock (28 LLM calls, ~49s/call — moderate Ollama load). Monitoring via `execute_code` with 60s sleep loops confirmed file-count progress; `process(action=\"log\")` captured full output only at exit (stdout buffering). 0 processed files remaining — clean exit.\n\n¹⁹ Clean `all` run via background mode. First attempt (bare `...python training_pipeline.py all`, no flags) hung silently: 0 output, 0% CPU, S-state for 78+s. Killed. Second attempt with full mandatory invocation (`TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 stdbuf -oL -eL ... > /tmp/pipeline_out.txt 2>&1`) completed cleanly. 0 captured (state caught up at session 334), 4 summarized, 17 graded (4 new + 13 orphaned from prior interrupted run). 0 kept, 17 deleted — standard grade-extraction bug (qwen3.5 verbose CoT on all grading calls). ~15 min wall-clock. Log-file redirect + file-count polling used for monitoring; `process(action=\"log\")` captured 0 lines until exit. This is the run that motivated adding the 🔴 MANDATORY INVOCATION block above — the agent ran the bare command first despite the skill documenting the flags, because they were buried in prose rather than presented as a non-negotiable template.
+¹⁸ Clean `all` run via background mode. First foreground attempt timed out at 600s; background retry with `notify_on_complete=true`. Bare invocation — no env overrides, no `stdbuf`. Default IP `100.84.92.74` worked. 1 captured, 13 summarized, 15 graded (13 new + 2 orphaned from prior runs). 0 kept, 15 deleted — standard grade-extraction bug (qwen3.5 verbose CoT on all grading calls). **Meta-recursion confirmed persistent** — grader output across multiple files included `\"THIS APPEARS TO BE A META-INTERACTION ABOUT THE GRADING PROCESS ITSELF\"`, confirming this is now the norm for pipeline-summary sessions. ~23 min wall-clock (28 LLM calls, ~49s/call — moderate Ollama load). Monitoring via `execute_code` with 60s sleep loops confirmed file-count progress; `process(action=\"log\")` captured full output only at exit (stdout buffering). 0 processed files remaining — clean exit.\n\n¹⁹ Clean `all` run via background mode. First attempt (bare `...python training_pipeline.py all`, no flags) hung silently: 0 output, 0% CPU, S-state for 78+s. Killed. Second attempt with full mandatory invocation (`TRAINING_LLM_URL=http://hq-ai:11435 PYTHONUNBUFFERED=1 stdbuf -oL -eL ... > /tmp/pipeline_out.txt 2>&1`) completed cleanly. 0 captured (state caught up at session 334), 4 summarized, 17 graded (4 new + 13 orphaned from prior interrupted run). 0 kept, 17 deleted — standard grade-extraction bug (qwen3.5 verbose CoT on all grading calls). ~15 min wall-clock. Log-file redirect + file-count polling used for monitoring; `process(action=\"log\")` captured 0 lines until exit. This is the run that motivated adding the 🔴 MANDATORY INVOCATION block above — the agent ran the bare command first despite the skill documenting the flags, because they were buried in prose rather than presented as a non-negotiable template.
 
 ²⁰ Clean `all` run via background mode with bare invocation (no `TRAINING_LLM_URL`, `PYTHONUNBUFFERED=1`, `stdbuf`, or log-file redirect) — completed successfully. Default IP reachable. 1 captured (333→334 raw), 14 summarized (1 new + 13 C/D re-summarizations), 18 graded (14 new + 4 orphaned). 2 kept (A), 16 deleted — grade-extraction bug in effect; 2 keepers from lucky bare-letter outputs. Meta-recursion continued: `\"THIS APPEARS TO BE A META-INTERACTION\"` across multiple files. ~10 min wall-clock. **Key: bare invocation succeeded** — the silent hang in ¹⁴/¹⁹ is intermittent, not guaranteed. The 🔴 MANDATORY INVOCATION flags are insurance against intermittent hangs, not a hard prerequisite. Agent still used bare invocation despite the mandatory block, and it worked.
 
-²¹ Bare invocation hung silently (0% CPU, S-state, 83s, no output). Killed. Ran stages individually: capture (0 new — state caught up at 338), summarize (12 new — all C/D re-summarizations), grade with full invocation flags `TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 stdbuf -oL -eL` (17 total: 12 new + 5 orphaned). 4 kept (A), 13 deleted — grade-extraction bug in effect; 4 keepers from lucky bare-letter outputs. ~6 min wall-clock for grade stage. Meta-recursion continued: grader output showed \"THIS APPEARS TO BE A META-INTERACTION ABOUT THE GRADING PROCESS ITSELF\" responses. Silent hang on bare invocation now 3 of last 8 runs (¹⁴, ¹⁹, ²¹).
+²¹ Bare invocation hung silently (0% CPU, S-state, 83s, no output). Killed. Ran stages individually: capture (0 new — state caught up at 338), summarize (12 new — all C/D re-summarizations), grade with full invocation flags `TRAINING_LLM_URL=http://hq-ai:11435 PYTHONUNBUFFERED=1 stdbuf -oL -eL` (17 total: 12 new + 5 orphaned). 4 kept (A), 13 deleted — grade-extraction bug in effect; 4 keepers from lucky bare-letter outputs. ~6 min wall-clock for grade stage. Meta-recursion continued: grader output showed \"THIS APPEARS TO BE A META-INTERACTION ABOUT THE GRADING PROCESS ITSELF\" responses. Silent hang on bare invocation now 3 of last 8 runs (¹⁴, ¹⁹, ²¹).
 
 The curated-path skip (applied in the code) prevents re-summarizing **A/B-kept sessions** (curated files exist → skip). However, **C/D-graded sessions have no curated file**, so `stage_summarize()` re-processes them on every run. This is the dominant source of wasted LLM calls: on `27 May cron #3`, 36 of 38 files summarized were previously-graded C/D sessions, not new captures. The cumulative `raw - curated` gap grows by ~2 per run as new sessions arrive; the summarize cost is ≈ `raw - curated` files per run, not just `delta(new captures)`.
 
@@ -237,8 +237,8 @@ See `references/re-summarization-bug.md` for full root-cause analysis and reprod
 
 ## LLM Details
 
-- Endpoint: `http://hq-ai:11434` (configurable via `TRAINING_LLM_URL` env var)
-- Model: `qwen3.5:9b` (configurable via `TRAINING_LLM_MODEL`)
+- Endpoint: `http://hq-ai:11435` (configurable via `TRAINING_LLM_URL` env var)
+- Model: `gemma4:latest` (configurable via `TRAINING_LLM_MODEL`; was `qwen3.5:9b` until ~19 Jul 2026 when hq-ai Ollama was updated)
 - Timeout: 300s per call (set in `call_ollama()`)
 - Summarize prompt: ~200-400 tokens in → ~100 tokens out (5-field template)
 - Grade prompt: ~100 tokens in → **~500-2000 tokens out** (qwen3.5 ignores "return ONLY the letter" and outputs full reasoning chains)
@@ -251,7 +251,7 @@ The hardcoded default LLM endpoint `http://100.84.92.74:11434` may or may not be
 **Status as of 2026-06-17:** The default IP has been reachable for ~20 consecutive runs (since ~31 May), making bare invocation reliable. The hostname remains the safer choice for diagnostic commands (raw IPs blocked by Hermes security scanner). The pipeline's internal `urllib.request` calls work with either URL.
 
 ```bash
-TRAINING_LLM_URL=http://hq-ai:11434 PYTHONUNBUFFERED=1 .../python training_pipeline.py all
+TRAINING_LLM_URL=http://hq-ai:11435 TRAINING_LLM_MODEL=gemma4:latest .../python training_pipeline.py all
 ```
 
 Verify connectivity before running: `tailscale ping hq-ai`.
